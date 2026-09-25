@@ -1,0 +1,25 @@
+services:
+  frontend:
+    build: ./app
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    environment:
+      EXPO_NO_TELEMETRY: "1"
+    stdin_open: true
+    tty: true
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
