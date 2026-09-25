@@ -1,5 +1,7 @@
 # Backend
 
+## IMPORTANT: No need to do this, if you just go docker road. Navigate to README.MD in the root folder
+
 Minimal Go HTTP server with no external dependencies. Requires Go 1.22 or newer.
 
 Alternatively, run `docker compose up --build backend` from the project root.

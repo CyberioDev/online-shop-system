@@ -1,5 +1,8 @@
 # Welcome to your Expo app 👋
 
+## IMPORTANT: No need to do this, if you just go docker road. Navigate to README.MD in the root folder
+
+
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started

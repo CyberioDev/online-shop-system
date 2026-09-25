@@ -8,18 +8,42 @@ services:
       - /app/node_modules
     environment:
       EXPO_NO_TELEMETRY: "1"
+      # Open the site from the host; containers cannot launch a desktop browser.
+      BROWSER: "none"
     stdin_open: true
     tty: true
 
   backend:
     build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
       PORT: "8080"
+      DATABASE_URL: "postgres://online_shop:online_shop@db:5432/online_shop?sslmode=disable"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
       interval: 10s
       timeout: 3s
       retries: 3
       start_period: 5s
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: online_shop
+      POSTGRES_USER: online_shop
+      POSTGRES_PASSWORD: online_shop
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U online_shop -d online_shop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  postgres_data:
