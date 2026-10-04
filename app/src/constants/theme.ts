@@ -1,65 +1,75 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
-import '@/global.css';
-
 import { Platform } from 'react-native';
 
+/**
+ * Design tokens taken from the Tulgagch UI mockup. The app ships a single light
+ * palette for now; keep every color here so a dark palette can be added later.
+ */
 export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
+  background: '#F3EFE8',
+  surface: '#FFFFFF',
+  surfaceMuted: '#EEE8DE',
+  border: '#E3DCCF',
+  borderStrong: '#CFC6B6',
+
+  text: '#1C1B18',
+  textSecondary: '#6B665C',
+  textMuted: '#9A9488',
+  textOnPrimary: '#FFFFFF',
+
+  primary: '#1F5E48',
+  primaryPressed: '#184B39',
+  primarySoft: '#E3EEE8',
+  primaryFaint: '#F1F6F3',
+  primaryOnDark: '#CFE3D8',
+
+  dark: '#1E1C19',
+  darkPressed: '#35322D',
+
+  warningSoft: '#FBEEDA',
+  warningBorder: '#EED3A2',
+  warningIconBg: '#F2D9A8',
+  warningText: '#5A3A00',
+  warningStrong: '#8A5A14',
+
+  dangerSoft: '#FBE1DE',
+  danger: '#B3261E',
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
+export const Fonts = {
+  display: 'Montserrat_800ExtraBold',
+  displayBold: 'Montserrat_700Bold',
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+} as const;
 
 export const Spacing = {
   half: 2,
   one: 4,
   two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+  three: 12,
+  four: 16,
+  five: 20,
+  six: 24,
+  eight: 32,
+  ten: 40,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+export const Radius = {
+  sm: 10,
+  md: 14,
+  lg: 18,
+  xl: 24,
+  pill: 999,
+} as const;
+
+/** Window width at which the layout switches from bottom tabs to a sidebar. */
+export const WideBreakpoint = 900;
+/** Max width of a single-column page (forms, login). */
+export const FormMaxWidth = 560;
+/** Max width of the main content area on desktop. */
+export const PageMaxWidth = 1040;
+
+/** Removes the browser focus ring on web inputs; the wrapper draws its own. */
+export const webNoOutline = Platform.select({ web: { outlineStyle: 'none' } as object, default: {} });

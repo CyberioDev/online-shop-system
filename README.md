@@ -43,5 +43,27 @@ docker compose up --build backend
 ```
 
 This setup runs the frontend for local web development. Native iOS/Android builds
-and phone connectivity require their own Expo setup. The frontend and backend
-are not connected yet; the backend currently only exposes a health endpoint.
+and phone connectivity require their own Expo setup.
+
+## Frontend demo mode
+
+The frontend and backend are not connected yet; the backend currently only exposes
+a health endpoint. Until then the app runs on in-memory demo data
+(`app/src/api/mock.ts`): sign in with the temporary test account `99996666` /
+`admintest` (shown on the login page; defined as `TEST_ACCOUNT` in
+`app/src/constants/config.ts`). Changes are lost on reload.
+
+## Connecting the backend
+
+Building the backend? Start with **[docs/backend-integration.md](docs/backend-integration.md)**
+(conventions, business rules, integration flows) and the API contract
+**[docs/api/openapi.yaml](docs/api/openapi.yaml)**.
+
+To point the app at a running backend, set `EXPO_PUBLIC_API_URL`:
+
+```sh
+EXPO_PUBLIC_API_URL=http://localhost:8080 docker compose up --build frontend backend
+```
+
+Without Docker, copy `app/.env.example` to `app/.env.local`, set the URL, and run
+`npx expo start --clear` (the `--clear` is needed whenever the URL changes).

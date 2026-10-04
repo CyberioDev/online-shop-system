@@ -1,0 +1,256 @@
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
+
+import type { DateRange } from '@/api';
+import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
+import { Colors, Radius, Spacing } from '@/constants/theme';
+import {
+  WEEKDAYS_SHORT_MON_FIRST,
+  formatMonthYear,
+  formatRangeShort,
+  fromDayKey,
+  toDayKey,
+} from '@/lib/format';
+
+/** Calendar modal for choosing an inclusive range of past days. */
+export function DateRangePicker({
+  visible,
+  initial,
+  onCancel,
+  onApply,
+}: {
+  visible: boolean;
+  initial: DateRange;
+  onCancel: () => void;
+  onApply: (range: DateRange) => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} accessibilityLabel="Хаах" />
+        {/* Remounted on every open so it starts from the current selection. */}
+        {visible && <Calendar initial={initial} onCancel={onCancel} onApply={onApply} />}
+      </View>
+    </Modal>
+  );
+}
+
+function Calendar({
+  initial,
+  onCancel,
+  onApply,
+}: {
+  initial: DateRange;
+  onCancel: () => void;
+  onApply: (range: DateRange) => void;
+}) {
+  const todayKey = toDayKey(new Date());
+  const [start, setStart] = useState<string | null>(initial.from);
+  const [end, setEnd] = useState<string | null>(initial.to);
+  const initialEnd = fromDayKey(initial.to);
+  const [view, setView] = useState({ year: initialEnd.getFullYear(), month: initialEnd.getMonth() });
+
+  const today = new Date();
+  const isCurrentMonth = view.year === today.getFullYear() && view.month === today.getMonth();
+
+  const shiftMonth = (delta: number) =>
+    setView(({ year, month }) => {
+      const date = new Date(year, month + delta, 1);
+      return { year: date.getFullYear(), month: date.getMonth() };
+    });
+
+  const selectDay = (key: string) => {
+    if (!start || end) {
+      setStart(key);
+      setEnd(null);
+    } else if (key < start) {
+      setStart(key);
+    } else {
+      setEnd(key);
+    }
+  };
+
+  // Monday-first grid with leading blanks.
+  const firstWeekday = (new Date(view.year, view.month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
+  const cells: (string | null)[] = [
+    ...Array.from({ length: firstWeekday }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, i) => toDayKey(new Date(view.year, view.month, i + 1))),
+  ];
+
+  const rangeEnd = end ?? start;
+
+  return (
+    <View style={styles.sheet} accessibilityViewIsModal>
+      <View style={styles.monthRow}>
+        <IconButton icon="chevron-left" label="Өмнөх сар" onPress={() => shiftMonth(-1)} />
+        <Text variant="heading">{formatMonthYear(view.year, view.month)}</Text>
+        <IconButton
+          icon="chevron-right"
+          label="Дараагийн сар"
+          onPress={() => shiftMonth(1)}
+          disabled={isCurrentMonth}
+        />
+      </View>
+
+      <View style={styles.grid}>
+        {WEEKDAYS_SHORT_MON_FIRST.map((day) => (
+          <View key={day} style={styles.cell}>
+            <Text variant="captionMedium" color={Colors.textMuted}>
+              {day}
+            </Text>
+          </View>
+        ))}
+        {cells.map((key, index) => {
+          if (!key) return <View key={`blank${index}`} style={styles.cell} />;
+          const future = key > todayKey;
+          const isStart = key === start;
+          const isEnd = key === rangeEnd;
+          const inRange = !!start && !!rangeEnd && key >= start && key <= rangeEnd;
+          const hasSpan = !!start && !!rangeEnd && start !== rangeEnd;
+
+          return (
+            <Pressable
+              key={key}
+              disabled={future}
+              onPress={() => selectDay(key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isStart || isEnd, disabled: future }}
+              style={[
+                styles.cell,
+                inRange && hasSpan && styles.band,
+                isStart && hasSpan && styles.bandStart,
+                isEnd && hasSpan && styles.bandEnd,
+              ]}>
+              <View style={[styles.day, (isStart || isEnd) && styles.dayEndpoint]}>
+                <Text
+                  variant={isStart || isEnd ? 'label' : 'body'}
+                  color={
+                    future ? Colors.border : isStart || isEnd ? Colors.textOnPrimary : Colors.text
+                  }>
+                  {fromDayKey(key).getDate()}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text variant="caption" color={Colors.textSecondary} style={styles.summary}>
+        {start ? formatRangeShort(start, rangeEnd ?? start) : 'Эхлэх өдрөө сонгоно уу'}
+        {start && !end ? ' · дуусах өдрөө сонгоно уу' : ''}
+      </Text>
+
+      <View style={styles.actions}>
+        <Button title="Болих" variant="outline" size="md" onPress={onCancel} style={styles.flex} />
+        <Button
+          title="Сонгох"
+          size="md"
+          disabled={!start}
+          onPress={() => start && onApply({ from: start, to: end ?? start })}
+          style={styles.flex}
+        />
+      </View>
+    </View>
+  );
+}
+
+function IconButton({
+  icon,
+  label,
+  onPress,
+  disabled,
+}: {
+  icon: 'chevron-left' | 'chevron-right';
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={8}
+      style={({ pressed }) => [styles.iconButton, pressed && { backgroundColor: Colors.surfaceMuted }]}>
+      <Icon name={icon} size={22} color={disabled ? Colors.border : Colors.text} />
+    </Pressable>
+  );
+}
+
+const CELL = 44;
+
+const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(28, 27, 24, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.five,
+  },
+  sheet: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    padding: Spacing.five,
+    gap: Spacing.three,
+  },
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: Spacing.one,
+  },
+  cell: {
+    width: `${100 / 7}%`,
+    height: CELL,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  band: {
+    backgroundColor: Colors.primarySoft,
+  },
+  bandStart: {
+    borderTopLeftRadius: CELL / 2,
+    borderBottomLeftRadius: CELL / 2,
+  },
+  bandEnd: {
+    borderTopRightRadius: CELL / 2,
+    borderBottomRightRadius: CELL / 2,
+  },
+  day: {
+    width: CELL - 4,
+    height: CELL - 4,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayEndpoint: {
+    backgroundColor: Colors.primary,
+  },
+  summary: {
+    textAlign: 'center',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+});
