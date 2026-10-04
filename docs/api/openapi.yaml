@@ -191,6 +191,52 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /products/{id}/preorder:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Products]
+      operationId: getPreorder
+      summary: Preorder overview (bulk order tally and buyers)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PreorderDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /products/{id}/preorder/status:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Products]
+      operationId: setPreorderStatus
+      summary: Close, reopen or mark a preorder as arrived
+      description: |
+        Allowed: `open → closed`, `closed → open`, `closed → arrived`; anything else is 409.
+        Closing stops the chatbot taking orders for this product. Marking `arrived` makes the
+        chatbot notify every buyer with a paid order.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/PreorderStatus' }
+      responses:
+        '200':
+          description: Updated product
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /uploads/images:
     post:
       operationId: uploadImage
@@ -646,30 +692,125 @@ components:
         name: { type: string, description: 'Free-form label, e.g. "L", "38", "Хар".' }
         quantity: { type: integer, minimum: 0 }
 
+    SaleType:
+      type: string
+      enum: [stock, preorder]
+      description: |
+        `stock` = goods on hand, sold from stock quantities. `preorder` = the shop collects
+        orders, then buys the total in bulk from abroad; no stock is tracked.
+
+    PreorderStatus:
+      type: string
+      enum: [open, closed, arrived]
+      description: |
+        `open` (chatbot takes orders) → `closed` (seller placed the bulk order; chatbot refuses
+        new orders) → `arrived` (goods are in; chatbot notifies paid buyers). `closed` may go
+        back to `open`; `arrived` is final.
+
+    PreorderSettings:
+      type: object
+      required: [closesOn, arrivalNote, limit]
+      properties:
+        closesOn:
+          type: string
+          format: date
+          nullable: true
+          description: |
+            Last day to order (Asia/Ulaanbaatar), inclusive. The backend moves an `open` preorder
+            to `closed` after this day ends. Null = open until closed by hand.
+        arrivalNote:
+          type: string
+          nullable: true
+          maxLength: 120
+          description: 'Free text the chatbot quotes, e.g. "Захиалга хаагдсанаас хойш 2–3 долоо хоногт ирнэ".'
+        limit:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Max total units across all variants; the chatbot refuses orders beyond it.
+
+    PreorderInfo:
+      type: object
+      required: [closesOn, arrivalNote, limit, status, ordered, paid]
+      properties:
+        closesOn: { type: string, format: date, nullable: true }
+        arrivalNote: { type: string, nullable: true }
+        limit: { type: integer, nullable: true }
+        status: { $ref: '#/components/schemas/PreorderStatus' }
+        ordered:
+          type: integer
+          description: Units in all orders for this product (paid, awaiting payment, in review).
+        paid:
+          type: integer
+          description: Units in paid orders (confirmed demand).
+
+    PreorderTallyRow:
+      type: object
+      required: [variantName, ordered, paid]
+      properties:
+        variantName: { type: string, nullable: true, description: Null when the product has no breakdown. }
+        ordered: { type: integer }
+        paid: { type: integer }
+
+    PreorderDetail:
+      type: object
+      required: [product, tally, orders]
+      properties:
+        product: { $ref: '#/components/schemas/Product' }
+        tally:
+          type: array
+          description: |
+            One row per variant in the product's variant order, including variants nobody ordered
+            yet (0/0); a single row with `variantName: null` when there is no breakdown.
+          items: { $ref: '#/components/schemas/PreorderTallyRow' }
+        orders:
+          type: array
+          description: Every order containing this product, newest first.
+          items: { $ref: '#/components/schemas/Order' }
+
     Product:
       type: object
-      required: [id, code, codeSource, name, price, imageUrl, variants, stock, createdAt]
+      required: [id, code, codeSource, saleType, name, price, imageUrl, variants, stock, preorder, createdAt]
       properties:
         id: { type: string }
-        code: { type: string, pattern: '^\d{3}$', description: Unique per shop. }
+        code: { type: string, pattern: '^[A-Z]{3}$', example: TOS, description: 'Three Latin letters, uppercase, unique per shop.' }
         codeSource: { type: string, enum: [auto, custom] }
+        saleType: { $ref: '#/components/schemas/SaleType' }
         name: { type: string }
         price: { $ref: '#/components/schemas/Money' }
         imageUrl: { type: string, nullable: true }
         variants:
           type: array
-          description: Empty when the product has no size/type breakdown.
+          description: |
+            Empty when the product has no size/type breakdown. For preorders `quantity` is
+            always 0 (ordered amounts are in `PreorderDetail.tally`).
           items: { $ref: '#/components/schemas/ProductVariant' }
         stock:
           type: integer
           minimum: 0
-          description: Quantity when `variants` is empty; 0 otherwise.
+          description: Quantity when `variants` is empty; 0 otherwise and always 0 for preorders.
+        preorder:
+          description: Set only when `saleType` is `preorder`.
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PreorderInfo'
         createdAt: { $ref: '#/components/schemas/Timestamp' }
 
     ProductInput:
       type: object
-      required: [name, price, imageUrl, code, variants, stock]
+      required: [saleType, name, price, imageUrl, code, variants, stock, preorder]
       properties:
+        saleType:
+          allOf:
+            - $ref: '#/components/schemas/SaleType'
+          description: Cannot change after creation (422 `validation`).
+        preorder:
+          description: Required when `saleType` is `preorder`; must be null otherwise.
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/PreorderSettings'
         name: { type: string, minLength: 1, maxLength: 80 }
         price: { type: integer, minimum: 1 }
         imageUrl:
@@ -679,11 +820,12 @@ components:
         code:
           type: string
           nullable: true
-          pattern: '^\d{3}$'
+          pattern: '^[A-Z]{3}$'
           description: |
-            A 3-digit code typed by the seller (→ `codeSource: custom`, 409 `code_taken` if used),
-            or null to let the server pick: keep the current code if it is already `auto`,
-            otherwise generate an unused one in 100–999 (→ `codeSource: auto`).
+            Three uppercase Latin letters typed by the seller (→ `codeSource: custom`, 409
+            `code_taken` if used), or null to let the server pick: keep the current code if it is
+            already `auto`, otherwise generate an unused one (→ `codeSource: auto`). Generated codes
+            avoid I and O and anything that reads like a size (XXL, or a variant name in the shop).
         variants:
           type: array
           items:

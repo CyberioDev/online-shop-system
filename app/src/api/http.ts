@@ -10,6 +10,7 @@ import {
   type Integrations,
   type MatchCandidate,
   type Order,
+  type PreorderDetail,
   type Product,
   type ProductInput,
   type ReportSummary,
@@ -140,6 +141,9 @@ export function createHttpApi(baseUrl: string): ApiClient {
       request<Product>('PUT', `/products/${id}`, await withUploadedImage(input)),
     updateProductPrice: (id, price) => request<Product>('PATCH', `/products/${id}`, { price }),
     deleteProduct: (id) => request<void>('DELETE', `/products/${id}`),
+    getPreorder: (id) => request<PreorderDetail>('GET', `/products/${id}/preorder`),
+    setPreorderStatus: (id, status) =>
+      request<Product>('POST', `/products/${id}/preorder/status`, { status }),
 
     getReport: (r) => request<ReportSummary>('GET', `/reports/summary?${range(r)}`),
     listOrders: (r) => request<Order[]>('GET', `/orders?${range(r)}`),

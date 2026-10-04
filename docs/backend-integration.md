@@ -71,8 +71,8 @@ Phones (native) don't need CORS.
 - **Calendar days are `YYYY-MM-DD` in `Asia/Ulaanbaatar`.** `from`/`to` are inclusive.
   "Today" on the dashboard is today in Ulaanbaatar, not UTC: compute day boundaries with
   `time.LoadLocation("Asia/Ulaanbaatar")`.
-- **Codes are strings**: product codes `"154"` (3 digits), order codes `"4827"` (4 digits).
-  Keep leading zeros if you ever allow them.
+- **Codes are strings**: product codes are 3 uppercase Latin letters (`"TOS"`); order
+  (purchase) codes are 4 digits (`"4827"`), kept as strings.
 
 ### Auth
 
@@ -116,6 +116,7 @@ The client times out after 20 s (60 s for image upload).
 | Шалгах case | `GET /review/cases/{id}`, `GET …/candidates?q=`, `POST …/resolve`, `POST …/contact`, `POST …/reopen` |
 | Бараа list | `GET /products`, `PATCH /products/{id}` (inline price) |
 | Product form | `GET /products/{id}`, `POST /uploads/images`, `POST /products`, `PUT /products/{id}`, `DELETE /products/{id}` |
+| Preorder overview | `GET /products/{id}/preorder`, `POST /products/{id}/preorder/status` (Excel is built in the app) |
 | Тайлан | `GET /reports/summary?from&to`, `GET /orders?from&to` (Excel/CSV is built in the app) |
 | Холболт | `GET /integrations`, `POST /integrations/meta/{platform}/connect`, `DELETE /integrations/meta/{platform}` |
 | Logout | `POST /auth/logout` |
@@ -124,12 +125,14 @@ The client times out after 20 s (60 s for image upload).
 
 ### Products
 
-- `code` is 3 digits and **unique per shop**. The seller either types one or lets the
-  server pick (`code: null` in the request):
+- `code` is **3 Latin letters A–Z**, stored uppercase, **unique per shop**. The seller either
+  types one or lets the server pick (`code: null` in the request):
   - typed → `codeSource: "custom"`; return `409 code_taken` if another product uses it;
   - `null` on a product whose code is already `auto` → **keep** that code;
-  - `null` on a new product or one with a `custom` code → generate an unused code in
-    100–999, `codeSource: "auto"` (this is how a seller reverts to a system code).
+  - `null` on a new product or one with a `custom` code → generate an unused code,
+    `codeSource: "auto"` (this is how a seller reverts to a system code). Skip I and O
+    (read as 1/l and 0) and codes that look like sizes (`XXL`, `XXS`, or any variant name
+    in the shop), since buyers write the code next to a size.
 - `variants` is the size/type breakdown (`"S"`, `"38"`, `"Хар"`). Names are unique within
   a product (case-insensitive). On `PUT`, match variants by name to keep their IDs. When
   `variants` is empty, `stock` is the quantity; otherwise `stock` is 0.
@@ -139,13 +142,40 @@ The client times out after 20 s (60 s for image upload).
 - Deleting a product must not break old orders: `OrderItem` copies `productName` and
   `unitPrice` at order time.
 
+### Preorders (урьдчилсан захиалга)
+
+Some shops don't hold stock. They collect orders for a product, then buy the total from
+abroad in one bulk order. Such products have `saleType: "preorder"` (fixed at creation;
+changing it is a `422`).
+
+- No stock: `stock` is 0 and every variant `quantity` is 0. The variants only list the
+  sizes/types buyers can choose.
+- Settings (`PreorderSettings`): `closesOn` (last day to order, Ulaanbaatar, inclusive, or
+  null), `arrivalNote` (free text the chatbot quotes), `limit` (max total units, or null).
+- `preorder.ordered` / `preorder.paid` = units in all orders vs. paid orders for the
+  product. `GET /products/{id}/preorder` returns the same split per variant (`tally`),
+  which is what the seller orders from the supplier, plus every buyer's order.
+- Lifecycle via `POST /products/{id}/preorder/status`:
+  `open → closed → arrived`, and `closed → open` to reopen. Other moves are `409 conflict`.
+  - **open**: the chatbot accepts orders exactly like stock products, but tells the buyer it
+    is a preorder, the deadline and the `arrivalNote`.
+  - **Auto-close**: when `closesOn` has passed, or `ordered` reaches `limit`, set the status
+    to `closed` (scheduled job, or check when orders are created). Refuse new orders politely
+    from then on.
+  - **arrived**: the chatbot messages every buyer with a **paid** order that the goods are in.
+    Unpaid orders stay as they are.
+- Payment matching and the review flow are the same for preorder orders.
+
 ### Orders (created by the chatbot)
 
 The flow the app's data reflects:
 
 1. A buyer sees a listing and messages the shop's Facebook page or Instagram with the
-   product code and size, e.g. `423 5XL` or `521 38`. Live-selling comments work the same
-   way (`channel: "live"`).
+   product code and size, e.g. `KTS 5XL` or `PUZ 38`. Live-selling comments work the same
+   way (`channel: "live"`). Match the code **case-insensitively** and map Cyrillic letters
+   that look like Latin ones (А В Е К М Н О Р С Т У Ү Х → A B E K M H O P C T Y Y X),
+   because buyers type on a Mongolian keyboard. The app does the same for sellers in
+   `app/src/lib/product-code.ts`.
 2. The chatbot replies with the product name, price and the available sizes/types. If the
    size is missing or ambiguous it asks for it.
 3. When the order is complete it creates an `Order` with a **4-digit purchase `code`**,
@@ -281,6 +311,11 @@ comments) that feed the chatbot are backend-only and not part of this contract.
 - **Order code space**: 4 digits allow 9,000 unpaid orders per shop at once, plenty, but
   avoid codes one digit away from another open order's code to reduce `code_typo` cases.
 - **Multiple banks**: the contract has `BankPayment.bank`; the listener currently assumes one sender.
+- **Preorder deposits**: preorders are currently paid in full up front. If shops want a
+  deposit (урьдчилгаа) and the rest on arrival, orders need a second payment step and the
+  matching must expect partial amounts.
+- **Unpaid preorder orders at closing**: whether they are cancelled when the preorder closes,
+  or can still be paid until the goods arrive.
 
 ## 8. Changing the contract
 

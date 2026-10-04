@@ -2,10 +2,12 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { api, type Product } from '@/api';
+import { api, type Product, type SaleType } from '@/api';
+import { PreorderStatusPill } from '@/components/preorder-status-pill';
 import { ProductThumb } from '@/components/product-thumb';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
 import { Icon } from '@/components/ui/icon';
 import { LoadState } from '@/components/ui/load-state';
 import { Screen } from '@/components/ui/screen';
@@ -15,19 +17,23 @@ import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
 import { errorMessage } from '@/lib/errors';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { formatMoney, formatNumber, formatShortDate, fromDayKey } from '@/lib/format';
 import { describeStock, totalStock } from '@/lib/labels';
 
 export default function ProductsScreen() {
   const isWide = useIsWide();
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<SaleType | 'all'>('all');
   const { data: products, error, reload, setData } = useResource(() => api.listProducts(), []);
   useReloadOnFocus(reload);
 
   const needle = query.trim().toLowerCase();
   const visible = (products ?? []).filter(
-    (p) => !needle || p.name.toLowerCase().includes(needle) || p.code.includes(needle),
+    (p) =>
+      (filter === 'all' || p.saleType === filter) &&
+      (!needle || p.name.toLowerCase().includes(needle) || p.code.toLowerCase().includes(needle)),
   );
+  const preorderCount = (products ?? []).filter((p) => p.saleType === 'preorder').length;
   const columns = isWide ? 2 : 1;
   const rows: Product[][] = [];
   for (let i = 0; i < visible.length; i += columns) rows.push(visible.slice(i, i + columns));
@@ -54,6 +60,22 @@ export default function ProductsScreen() {
             {products.length} бараа · Үнийг харандаа дээр дарж шууд засна
           </Text>
 
+          {preorderCount > 0 && (
+            <View style={styles.filters}>
+              <Chip label="Бүгд" selected={filter === 'all'} onPress={() => setFilter('all')} />
+              <Chip
+                label="Бэлэн бараа"
+                selected={filter === 'stock'}
+                onPress={() => setFilter('stock')}
+              />
+              <Chip
+                label={`Урьдчилсан захиалга (${preorderCount})`}
+                selected={filter === 'preorder'}
+                onPress={() => setFilter('preorder')}
+              />
+            </View>
+          )}
+
           {products.length > 0 && (
             <TextField
               placeholder="Бараа эсвэл код хайх"
@@ -78,7 +100,7 @@ export default function ProductsScreen() {
             </Card>
           ) : visible.length === 0 ? (
             <Text color={Colors.textSecondary} style={[styles.center, styles.noResults]}>
-              «{query.trim()}» илэрц олдсонгүй.
+              {needle ? `«${query.trim()}» илэрц олдсонгүй.` : 'Энэ төрлийн бараа алга.'}
             </Text>
           ) : (
             rows.map((row) => (
@@ -116,7 +138,8 @@ function ProductCard({
   product: Product;
   onUpdated: (product: Product) => void;
 }) {
-  const soldOut = totalStock(product) === 0;
+  const isPreorder = product.saleType === 'preorder';
+  const soldOut = !isPreorder && totalStock(product) === 0;
   const [editingPrice, setEditingPrice] = useState(false);
 
   return (
@@ -124,7 +147,11 @@ function ProductCard({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${product.name}, код ${product.code}`}
-        onPress={() => router.push({ pathname: '/product/[id]', params: { id: product.id } })}
+        onPress={() =>
+          isPreorder
+            ? router.push({ pathname: '/preorder/[id]', params: { id: product.id } })
+            : router.push({ pathname: '/product/[id]', params: { id: product.id } })
+        }
         style={({ pressed }) => [styles.cardMain, pressed && styles.cardPressed]}>
         <ProductThumb uri={product.imageUrl} size={76} />
         <View style={styles.cardBody}>
@@ -142,7 +169,11 @@ function ProductCard({
               <Icon name="edit-2" size={14} color={Colors.textSecondary} />
             </Pressable>
           </View>
-          <StockLine product={product} soldOut={soldOut} />
+          {isPreorder ? (
+            <PreorderLine product={product} />
+          ) : (
+            <StockLine product={product} soldOut={soldOut} />
+          )}
         </View>
         <View style={styles.code}>
           <Text variant="caption" color={Colors.textSecondary} style={styles.codeLabel}>
@@ -242,6 +273,26 @@ function PriceEditor({
   );
 }
 
+/** Status and progress of a preorder instead of stock. */
+function PreorderLine({ product }: { product: Product }) {
+  const preorder = product.preorder;
+  if (!preorder) return null;
+  const counts = `Захиалсан ${preorder.ordered}${preorder.limit ? ` / ${preorder.limit}` : ''} ш · төлсөн ${preorder.paid}`;
+  const deadline =
+    preorder.status === 'open' && preorder.closesOn
+      ? ` · ${formatShortDate(fromDayKey(preorder.closesOn))} хүртэл`
+      : '';
+  return (
+    <View style={styles.preorderLine}>
+      <PreorderStatusPill status={preorder.status} prefix="Урьдчилсан" short />
+      <Text variant="caption" color={Colors.textSecondary}>
+        {counts}
+        {deadline}
+      </Text>
+    </View>
+  );
+}
+
 function StockLine({ product, soldOut }: { product: Product; soldOut: boolean }) {
   return soldOut ? (
     <View style={styles.soldOut}>
@@ -268,6 +319,15 @@ const styles = StyleSheet.create({
   },
   body: {
     gap: Spacing.four,
+  },
+  filters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  preorderLine: {
+    gap: Spacing.one,
+    marginTop: Spacing.half,
   },
   searchIcon: {
     paddingLeft: Spacing.four,

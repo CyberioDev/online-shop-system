@@ -1,4 +1,17 @@
-import type { Channel, Order, Product } from '@/api/types';
+import type { Channel, Order, PreorderStatus, Product } from '@/api/types';
+
+export const PREORDER_STATUS_LABELS: Record<PreorderStatus, string> = {
+  open: 'Захиалга авч байна',
+  closed: 'Захиалга хаасан',
+  arrived: 'Бараа ирсэн',
+};
+
+/** Compact versions for narrow places like product cards. */
+export const PREORDER_STATUS_SHORT: Record<PreorderStatus, string> = {
+  open: 'Нээлттэй',
+  closed: 'Хаагдсан',
+  arrived: 'Ирсэн',
+};
 
 export const CHANNEL_LABELS: Record<Channel, string> = {
   live: 'Шууд худалдаа',

@@ -32,22 +32,64 @@ export type ProductVariant = {
   quantity: number;
 };
 
+/**
+ * `stock`: goods on hand, sold from `stock` / variant quantities.
+ * `preorder`: goods ordered from abroad in bulk after buyers order; no stock is tracked.
+ */
+export type SaleType = 'stock' | 'preorder';
+
+/**
+ * Preorder lifecycle: `open` (chatbot takes orders) → `closed` (seller placed the bulk
+ * order; chatbot stops taking orders) → `arrived` (goods are in; buyers are notified).
+ * `closed` can go back to `open`; `arrived` is final.
+ */
+export type PreorderStatus = 'open' | 'closed' | 'arrived';
+
+/** What the seller sets for a preorder. */
+export type PreorderSettings = {
+  /** Last day to order (`YYYY-MM-DD`, Ulaanbaatar), inclusive; null = until closed by hand. */
+  closesOn: string | null;
+  /** Free text the chatbot quotes, e.g. "Захиалга хаагдсанаас хойш 2–3 долоо хоногт ирнэ". */
+  arrivalNote: string | null;
+  /** Max total units to accept across all variants; null = no limit. */
+  limit: number | null;
+};
+
+export type PreorderInfo = PreorderSettings & {
+  status: PreorderStatus;
+  /** Units in all orders for this product (paid + awaiting payment + in review). */
+  ordered: number;
+  /** Units in paid orders: confirmed demand. */
+  paid: number;
+};
+
 export type Product = {
   id: string;
-  /** Unique 3-digit code buyers type in chat, e.g. "154". */
+  /**
+   * Unique 3-letter code buyers type in chat, e.g. "TOS". Latin A–Z, always uppercase;
+   * buyers may type it in any case.
+   */
   code: string;
   /** Whether the system generated the code or the seller typed it. */
   codeSource: 'auto' | 'custom';
+  saleType: SaleType;
   name: string;
   price: number;
   imageUrl: string | null;
-  /** Empty when the product has no breakdown; then `stock` holds the quantity. */
+  /**
+   * Size/type breakdown; empty when there is none. For stock products `quantity` is
+   * stock on hand; for preorders it is always 0 (see `PreorderDetail.tally`).
+   */
   variants: ProductVariant[];
+  /** Stock on hand when `variants` is empty; always 0 for preorders. */
   stock: number;
+  /** Set only when `saleType` is `preorder`. */
+  preorder: PreorderInfo | null;
   createdAt: string;
 };
 
 export type ProductInput = {
+  saleType: SaleType;
   name: string;
   price: number;
   imageUrl: string | null;
@@ -56,8 +98,26 @@ export type ProductInput = {
    * otherwise (new product, or reverting from a custom code) a new unique one is generated.
    */
   code: string | null;
+  /** For preorders send quantity 0; only the names matter. */
   variants: { name: string; quantity: number }[];
   stock: number;
+  /** Required when `saleType` is `preorder`, null otherwise. */
+  preorder: PreorderSettings | null;
+};
+
+/** Ordered units for one variant of a preorder (variantName null = no breakdown). */
+export type PreorderTallyRow = {
+  variantName: string | null;
+  ordered: number;
+  paid: number;
+};
+
+export type PreorderDetail = {
+  product: Product;
+  /** One row per variant (including ones nobody ordered yet), in the product's variant order. */
+  tally: PreorderTallyRow[];
+  /** Every order containing this product, newest first. */
+  orders: Order[];
 };
 
 // ---------- Orders ----------
@@ -273,6 +333,8 @@ export interface ApiClient {
   updateProduct(id: string, input: ProductInput): Promise<Product>;
   updateProductPrice(id: string, price: number): Promise<Product>;
   deleteProduct(id: string): Promise<void>;
+  getPreorder(id: string): Promise<PreorderDetail>;
+  setPreorderStatus(id: string, status: PreorderStatus): Promise<Product>;
 
   getReport(range: DateRange): Promise<ReportSummary>;
   listOrders(range: DateRange): Promise<Order[]>;

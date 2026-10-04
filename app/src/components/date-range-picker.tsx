@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import type { DateRange } from '@/api';
@@ -14,7 +14,7 @@ import {
   toDayKey,
 } from '@/lib/format';
 
-/** Calendar modal for choosing an inclusive range of past days. */
+/** Calendar modal for choosing an inclusive range of past days (up to today). */
 export function DateRangePicker({
   visible,
   initial,
@@ -27,33 +27,89 @@ export function DateRangePicker({
   onApply: (range: DateRange) => void;
 }) {
   return (
+    <CalendarModal visible={visible} onCancel={onCancel}>
+      <Calendar
+        mode="range"
+        initial={initial}
+        max={toDayKey(new Date())}
+        onCancel={onCancel}
+        onApply={onApply}
+      />
+    </CalendarModal>
+  );
+}
+
+/** Calendar modal for choosing one day on or after `min` (e.g. a future deadline). */
+export function DatePicker({
+  visible,
+  value,
+  min,
+  onCancel,
+  onApply,
+}: {
+  visible: boolean;
+  value: string | null;
+  min: string;
+  onCancel: () => void;
+  onApply: (day: string) => void;
+}) {
+  return (
+    <CalendarModal visible={visible} onCancel={onCancel}>
+      <Calendar
+        mode="single"
+        initial={value ? { from: value, to: value } : null}
+        min={min}
+        onCancel={onCancel}
+        onApply={(range) => onApply(range.from)}
+      />
+    </CalendarModal>
+  );
+}
+
+function CalendarModal({
+  visible,
+  onCancel,
+  children,
+}: {
+  visible: boolean;
+  onCancel: () => void;
+  children: ReactNode;
+}) {
+  return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} accessibilityLabel="Хаах" />
         {/* Remounted on every open so it starts from the current selection. */}
-        {visible && <Calendar initial={initial} onCancel={onCancel} onApply={onApply} />}
+        {visible && children}
       </View>
     </Modal>
   );
 }
 
 function Calendar({
+  mode,
   initial,
+  min,
+  max,
   onCancel,
   onApply,
 }: {
-  initial: DateRange;
+  mode: 'range' | 'single';
+  initial: DateRange | null;
+  /** Earliest / latest selectable day (`YYYY-MM-DD`). */
+  min?: string;
+  max?: string;
   onCancel: () => void;
   onApply: (range: DateRange) => void;
 }) {
-  const todayKey = toDayKey(new Date());
-  const [start, setStart] = useState<string | null>(initial.from);
-  const [end, setEnd] = useState<string | null>(initial.to);
-  const initialEnd = fromDayKey(initial.to);
-  const [view, setView] = useState({ year: initialEnd.getFullYear(), month: initialEnd.getMonth() });
+  const [start, setStart] = useState<string | null>(initial?.from ?? null);
+  const [end, setEnd] = useState<string | null>(initial?.to ?? null);
+  const shown = fromDayKey(initial?.to ?? min ?? toDayKey(new Date()));
+  const [view, setView] = useState({ year: shown.getFullYear(), month: shown.getMonth() });
 
-  const today = new Date();
-  const isCurrentMonth = view.year === today.getFullYear() && view.month === today.getMonth();
+  const monthStart = toDayKey(new Date(view.year, view.month, 1));
+  const monthEnd = toDayKey(new Date(view.year, view.month + 1, 0));
+  const isOutside = (key: string) => (!!min && key < min) || (!!max && key > max);
 
   const shiftMonth = (delta: number) =>
     setView(({ year, month }) => {
@@ -62,7 +118,10 @@ function Calendar({
     });
 
   const selectDay = (key: string) => {
-    if (!start || end) {
+    if (mode === 'single') {
+      setStart(key);
+      setEnd(key);
+    } else if (!start || end) {
       setStart(key);
       setEnd(null);
     } else if (key < start) {
@@ -85,13 +144,18 @@ function Calendar({
   return (
     <View style={styles.sheet} accessibilityViewIsModal>
       <View style={styles.monthRow}>
-        <IconButton icon="chevron-left" label="Өмнөх сар" onPress={() => shiftMonth(-1)} />
+        <IconButton
+          icon="chevron-left"
+          label="Өмнөх сар"
+          onPress={() => shiftMonth(-1)}
+          disabled={!!min && monthStart <= min}
+        />
         <Text variant="heading">{formatMonthYear(view.year, view.month)}</Text>
         <IconButton
           icon="chevron-right"
           label="Дараагийн сар"
           onPress={() => shiftMonth(1)}
-          disabled={isCurrentMonth}
+          disabled={!!max && monthEnd >= max}
         />
       </View>
 
@@ -105,7 +169,7 @@ function Calendar({
         ))}
         {cells.map((key, index) => {
           if (!key) return <View key={`blank${index}`} style={styles.cell} />;
-          const future = key > todayKey;
+          const outside = isOutside(key);
           const isStart = key === start;
           const isEnd = key === rangeEnd;
           const inRange = !!start && !!rangeEnd && key >= start && key <= rangeEnd;
@@ -114,10 +178,10 @@ function Calendar({
           return (
             <Pressable
               key={key}
-              disabled={future}
+              disabled={outside}
               onPress={() => selectDay(key)}
               accessibilityRole="button"
-              accessibilityState={{ selected: isStart || isEnd, disabled: future }}
+              accessibilityState={{ selected: isStart || isEnd, disabled: outside }}
               style={[
                 styles.cell,
                 inRange && hasSpan && styles.band,
@@ -128,7 +192,7 @@ function Calendar({
                 <Text
                   variant={isStart || isEnd ? 'label' : 'body'}
                   color={
-                    future ? Colors.border : isStart || isEnd ? Colors.textOnPrimary : Colors.text
+                    outside ? Colors.border : isStart || isEnd ? Colors.textOnPrimary : Colors.text
                   }>
                   {fromDayKey(key).getDate()}
                 </Text>
@@ -139,8 +203,14 @@ function Calendar({
       </View>
 
       <Text variant="caption" color={Colors.textSecondary} style={styles.summary}>
-        {start ? formatRangeShort(start, rangeEnd ?? start) : 'Эхлэх өдрөө сонгоно уу'}
-        {start && !end ? ' · дуусах өдрөө сонгоно уу' : ''}
+        {mode === 'single'
+          ? start
+            ? formatRangeShort(start, start)
+            : 'Өдрөө сонгоно уу'
+          : start
+            ? formatRangeShort(start, rangeEnd ?? start)
+            : 'Эхлэх өдрөө сонгоно уу'}
+        {mode === 'range' && start && !end ? ' · дуусах өдрөө сонгоно уу' : ''}
       </Text>
 
       <View style={styles.actions}>

@@ -2,7 +2,7 @@ import { usePathname } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, Tabs, type TabTriggerSlotProps } from 'expo-router/ui';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '@/api';
 import { useUser } from '@/auth/auth-context';
@@ -14,7 +14,7 @@ import { useIsWide } from '@/hooks/use-is-wide';
 import { useResource } from '@/hooks/use-resource';
 
 /**
- * Main navigation: a bottom tab bar on phones and a left sidebar on wide screens.
+ * Main navigation: a tab bar along the top on phones and a left sidebar on wide screens.
  * Both come from the same `TabList`, which only changes position and styling.
  */
 export default function TabsLayout() {
@@ -57,10 +57,25 @@ export default function TabsLayout() {
 
   return (
     <Tabs style={[styles.root, isWide && styles.rootWide]}>
-      {isWide && tabList}
-      <TabSlot style={styles.slot} />
-      {!isWide && tabList}
+      {tabList}
+      <ContentInsets isWide={isWide}>
+        <TabSlot style={styles.slot} />
+      </ContentInsets>
     </Tabs>
+  );
+}
+
+/**
+ * On phones the top bar already sits below the status bar, so screens under it get a
+ * zero top inset; otherwise they would pad for the status bar a second time.
+ */
+function ContentInsets({ isWide, children }: { isWide: boolean; children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  if (isWide) return children;
+  return (
+    <SafeAreaInsetsContext.Provider value={{ ...insets, top: 0 }}>
+      {children}
+    </SafeAreaInsetsContext.Provider>
   );
 }
 
@@ -69,9 +84,7 @@ function NavContainer({ isWide, children, ...props }: ViewProps & { isWide: bool
 
   if (!isWide) {
     return (
-      <View
-        {...props}
-        style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, Spacing.two) }]}>
+      <View {...props} style={[styles.topBar, { paddingTop: insets.top + Spacing.one }]}>
         {children}
       </View>
     );
@@ -132,8 +145,9 @@ function NavButton({
       accessibilityState={{ selected: isFocused }}
       accessibilityLabel={badge ? `${children}, ${badge}` : undefined}
       style={({ pressed }) => [
-        isWide ? styles.sideItem : styles.bottomItem,
+        isWide ? styles.sideItem : styles.topItem,
         isWide && isFocused && styles.sideItemActive,
+        !isWide && isFocused && styles.topItemActive,
         pressed && { opacity: 0.7 },
       ]}>
       <View>
@@ -143,7 +157,7 @@ function NavButton({
       <Text
         variant={isFocused ? 'captionMedium' : 'caption'}
         color={isFocused ? Colors.primary : Colors.textSecondary}
-        style={isWide ? styles.sideLabel : styles.bottomLabel}>
+        style={isWide ? styles.sideLabel : styles.topLabel}>
         {children}
       </Text>
       {isWide && badgeView}
@@ -187,20 +201,26 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontFamily: Fonts.bold,
   },
-  bottomBar: {
+  topBar: {
     flexDirection: 'row',
     backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: Spacing.two,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  bottomItem: {
+  topItem: {
     flex: 1,
     alignItems: 'center',
     gap: Spacing.one,
-    paddingVertical: Spacing.one,
+    paddingTop: Spacing.two,
+    paddingBottom: Spacing.two,
+    // Reserve the indicator's space so the active tab doesn't shift.
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
-  bottomLabel: {
+  topItemActive: {
+    borderBottomColor: Colors.primary,
+  },
+  topLabel: {
     fontSize: 12,
     lineHeight: 16,
   },

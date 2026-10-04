@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { api, ApiError, type Product, type ProductInput } from '@/api';
+import { api, ApiError, type Product, type ProductInput, type SaleType } from '@/api';
+import { DatePicker } from '@/components/date-range-picker';
 import { ProductThumb } from '@/components/product-thumb';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
@@ -16,12 +17,18 @@ import { TextField } from '@/components/ui/text-field';
 import { Colors, FormMaxWidth, Radius, Spacing } from '@/constants/theme';
 import { confirm } from '@/lib/confirm';
 import { errorMessage } from '@/lib/errors';
-import { formatNumber } from '@/lib/format';
+import { addDays, formatNumber, formatShortDate, fromDayKey, toDayKey } from '@/lib/format';
+import { normalizeProductCode, PRODUCT_CODE_PATTERN } from '@/lib/product-code';
 
 type StockMode = 'single' | 'breakdown';
 type CodeMode = 'auto' | 'custom';
 type VariantRow = { key: string; name: string; quantity: string };
-type Errors = Partial<Record<'name' | 'price' | 'stock' | 'variants' | 'code' | 'form', string>>;
+type Errors = Partial<
+  Record<'name' | 'price' | 'stock' | 'variants' | 'code' | 'closesOn' | 'limit' | 'form', string>
+>;
+
+/** Quick deadlines for preorders, in days from today. */
+const DEADLINE_PRESETS = [7, 14, 30];
 
 const PRESETS: { label: string; values: string[] }[] = [
   { label: 'S · M · L · XL', values: ['S', 'M', 'L', 'XL'] },
@@ -36,6 +43,16 @@ const digitsOnly = (text: string, max: number) => text.replace(/\D/g, '').slice(
 /** Add/edit product page. Pass `product` to edit an existing one. */
 export function ProductForm({ product }: { product?: Product }) {
   const isEdit = !!product;
+  const todayKey = toDayKey(new Date());
+  // The sale type is fixed once the product exists (orders depend on it).
+  const [saleType, setSaleType] = useState<SaleType>(product?.saleType ?? 'stock');
+  const isPreorder = saleType === 'preorder';
+  const [closesOn, setClosesOn] = useState<string | null>(
+    product ? (product.preorder?.closesOn ?? null) : toDayKey(addDays(new Date(), 7)),
+  );
+  const [arrivalNote, setArrivalNote] = useState(product?.preorder?.arrivalNote ?? '');
+  const [limit, setLimit] = useState(product?.preorder?.limit ? String(product.preorder.limit) : '');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [imageUri, setImageUri] = useState(product?.imageUrl ?? null);
   const [name, setName] = useState(product?.name ?? '');
   const [price, setPrice] = useState(product ? String(product.price) : '');
@@ -55,7 +72,8 @@ export function ProductForm({ product }: { product?: Product }) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const filledRows = rows.filter((r) => r.name.trim() || r.quantity);
+  // Preorders have no stock, so only the names matter there.
+  const filledRows = rows.filter((r) => r.name.trim() || (!isPreorder && r.quantity));
   const breakdownTotal = filledRows.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0);
 
   const pickImage = async () => {
@@ -82,31 +100,53 @@ export function ProductForm({ product }: { product?: Product }) {
     if (!(Number(price) > 0)) next.price = 'Үнээ оруулна уу.';
 
     if (stockMode === 'single') {
-      if (stock === '') next.stock = 'Тоо ширхэгээ оруулна уу.';
+      if (!isPreorder && stock === '') next.stock = 'Тоо ширхэгээ оруулна уу.';
     } else {
       const names = filledRows.map((r) => r.name.trim().toLowerCase());
       if (filledRows.length === 0) next.variants = 'Дор хаяж нэг мөр бөглөнө үү.';
       else if (filledRows.some((r) => !r.name.trim())) next.variants = 'Мөр бүрт нэр бичнэ үү.';
-      else if (filledRows.some((r) => r.quantity === ''))
+      else if (!isPreorder && filledRows.some((r) => r.quantity === ''))
         next.variants = 'Мөр бүрт тоо ширхэг бичнэ үү.';
       else if (new Set(names).size !== names.length) next.variants = 'Нэр давхардсан байна.';
     }
 
-    if (codeMode === 'custom' && !/^\d{3}$/.test(code)) next.code = '3 оронтой тоо оруулна уу.';
+    if (codeMode === 'custom' && !PRODUCT_CODE_PATTERN.test(code)) {
+      next.code = '3 латин үсэг оруулна уу.';
+    }
+
+    if (isPreorder) {
+      // A past date is fine if it was already saved (e.g. an order round that has closed).
+      const unchanged = closesOn === (product?.preorder?.closesOn ?? undefined);
+      if (closesOn && closesOn < todayKey && !unchanged) {
+        next.closesOn = 'Өнгөрсөн огноо сонгох боломжгүй.';
+      }
+      if (limit !== '' && !(Number(limit) > 0)) next.limit = '0-ээс их тоо оруулна уу.';
+    }
 
     setErrors(next);
     if (Object.keys(next).length > 0) return null;
 
     return {
+      saleType,
       name: name.trim(),
       price: Number(price),
       imageUrl: imageUri,
       code: codeMode === 'custom' ? code : null,
       variants:
         stockMode === 'breakdown'
-          ? filledRows.map((r) => ({ name: r.name.trim(), quantity: Number(r.quantity) }))
+          ? filledRows.map((r) => ({
+              name: r.name.trim(),
+              quantity: isPreorder ? 0 : Number(r.quantity),
+            }))
           : [],
-      stock: stockMode === 'single' ? Number(stock) : 0,
+      stock: !isPreorder && stockMode === 'single' ? Number(stock) : 0,
+      preorder: isPreorder
+        ? {
+            closesOn,
+            arrivalNote: arrivalNote.trim() || null,
+            limit: limit === '' ? null : Number(limit),
+          }
+        : null,
     };
   };
 
@@ -148,14 +188,16 @@ export function ProductForm({ product }: { product?: Product }) {
     }
   };
 
+  const presetKeys = DEADLINE_PRESETS.map((days) => toDayKey(addDays(new Date(), days)));
+  const customDeadline = closesOn !== null && !presetKeys.includes(closesOn);
   const keepsAutoCode = product?.codeSource === 'auto';
   const autoCodeMessage = !product
-    ? 'Хадгалахад систем давхцахгүй 3 оронтой код автоматаар өгнө.'
+    ? 'Хадгалахад систем давхцахгүй 3 үсэгтэй код автоматаар өгнө.'
     : keepsAutoCode
       ? `Систем өгсөн ${product.code} код хэвээр үлдэнэ.`
-      : `Хадгалахад систем шинэ 3 оронтой код өгнө. Одоогийн ${product.code} код солигдох тул худалдан авагчдад шинэ кодоо мэдэгдээрэй.`;
+      : `Хадгалахад систем шинэ 3 үсэгтэй код өгнө. Одоогийн ${product.code} код солигдох тул худалдан авагчдад шинэ кодоо мэдэгдээрэй.`;
   const exampleCode =
-    codeMode === 'custom' ? code || '123' : keepsAutoCode && product ? product.code : '123';
+    codeMode === 'custom' ? code || 'ABC' : keepsAutoCode && product ? product.code : 'ABC';
   const exampleVariant = stockMode === 'breakdown' ? `${filledRows[0]?.name.trim() || 'L'} ` : '';
 
   return (
@@ -190,6 +232,32 @@ export function ProductForm({ product }: { product?: Product }) {
         </View>
       }>
       <View style={styles.form}>
+        {/* Sale type */}
+        <View style={styles.section}>
+          <Text variant="label">Борлуулах хэлбэр</Text>
+          {isEdit ? (
+            <Text color={Colors.textSecondary}>
+              {isPreorder ? 'Урьдчилсан захиалга' : 'Бэлэн бараа'} · үүсгэсний дараа солих боломжгүй
+            </Text>
+          ) : (
+            <>
+              <SegmentedControl
+                options={[
+                  { value: 'stock', label: 'Бэлэн бараа' },
+                  { value: 'preorder', label: 'Урьдчилсан захиалга' },
+                ]}
+                value={saleType}
+                onChange={setSaleType}
+              />
+              <Text variant="caption" color={Colors.textSecondary}>
+                {isPreorder
+                  ? 'Захиалга цуглуулаад, хаагдсаны дараа гаднаас бөөнөөр захиална. Үлдэгдэл бүртгэхгүй, захиалсан тоог систем тоолно.'
+                  : 'Гарт байгаа барааг үлдэгдлээр нь зарна.'}
+              </Text>
+            </>
+          )}
+        </View>
+
         {/* Image */}
         <View style={styles.imageRow}>
           <Pressable
@@ -246,7 +314,7 @@ export function ProductForm({ product }: { product?: Product }) {
 
         {/* Stock */}
         <View style={styles.section}>
-          <Text variant="label">Үлдэгдэл</Text>
+          <Text variant="label">{isPreorder ? 'Хэмжээ, төрөл' : 'Үлдэгдэл'}</Text>
           <SegmentedControl
             options={[
               { value: 'single', label: 'Нэг төрөл' },
@@ -256,7 +324,11 @@ export function ProductForm({ product }: { product?: Product }) {
             onChange={setStockMode}
           />
 
-          {stockMode === 'single' ? (
+          {stockMode === 'single' && isPreorder ? (
+            <Text variant="caption" color={Colors.textSecondary}>
+              Хэмжээ, төрөлгүй бараа. Захиалсан тоог систем тоолно.
+            </Text>
+          ) : stockMode === 'single' ? (
             <TextField
               placeholder="Тоо ширхэг"
               keyboardType="number-pad"
@@ -281,9 +353,11 @@ export function ProductForm({ product }: { product?: Product }) {
                 <Text variant="captionMedium" color={Colors.textSecondary} style={styles.flex}>
                   Хэмжээ / төрөл
                 </Text>
-                <Text variant="captionMedium" color={Colors.textSecondary} style={styles.qtyCol}>
-                  Тоо ширхэг
-                </Text>
+                {!isPreorder && (
+                  <Text variant="captionMedium" color={Colors.textSecondary} style={styles.qtyCol}>
+                    Тоо ширхэг
+                  </Text>
+                )}
                 <View style={styles.removeCol} />
               </View>
 
@@ -296,14 +370,16 @@ export function ProductForm({ product }: { product?: Product }) {
                     maxLength={20}
                     containerStyle={styles.flex}
                   />
-                  <TextField
-                    placeholder="0"
-                    keyboardType="number-pad"
-                    value={row.quantity}
-                    onChangeText={(text) => updateRow(row.key, { quantity: digitsOnly(text, 5) })}
-                    containerStyle={styles.qtyCol}
-                    suffix={<Suffix>ш</Suffix>}
-                  />
+                  {!isPreorder && (
+                    <TextField
+                      placeholder="0"
+                      keyboardType="number-pad"
+                      value={row.quantity}
+                      onChangeText={(text) => updateRow(row.key, { quantity: digitsOnly(text, 5) })}
+                      containerStyle={styles.qtyCol}
+                      suffix={<Suffix>ш</Suffix>}
+                    />
+                  )}
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Мөр устгах"
@@ -322,7 +398,7 @@ export function ProductForm({ product }: { product?: Product }) {
                   size="sm"
                   onPress={() => setRows((current) => [...current, newRow()])}
                 />
-                <Text variant="label">Нийт: {breakdownTotal} ш</Text>
+                {!isPreorder && <Text variant="label">Нийт: {breakdownTotal} ш</Text>}
               </View>
 
               {errors.variants && (
@@ -333,6 +409,81 @@ export function ProductForm({ product }: { product?: Product }) {
             </View>
           )}
         </View>
+
+        {isPreorder && (
+          <>
+            <View style={styles.section}>
+              <Text variant="label">Захиалга авах эцсийн өдөр</Text>
+              <View style={styles.inlineWrap}>
+                <Chip
+                  label="Хугацаагүй"
+                  selected={closesOn === null}
+                  onPress={() => setClosesOn(null)}
+                />
+                {DEADLINE_PRESETS.map((days, i) => (
+                  <Chip
+                    key={days}
+                    label={`${days} хоног`}
+                    selected={closesOn === presetKeys[i]}
+                    onPress={() => setClosesOn(presetKeys[i])}
+                  />
+                ))}
+                <Chip
+                  label={
+                    customDeadline && closesOn
+                      ? `${formatShortDate(fromDayKey(closesOn))} хүртэл`
+                      : 'Огноо сонгох'
+                  }
+                  icon="calendar"
+                  selected={customDeadline}
+                  onPress={() => setDatePickerOpen(true)}
+                />
+              </View>
+              {errors.closesOn ? (
+                <Text variant="caption" color={Colors.danger}>
+                  {errors.closesOn}
+                </Text>
+              ) : (
+                <Text variant="caption" color={Colors.textSecondary}>
+                  {closesOn
+                    ? `${formatShortDate(fromDayKey(closesOn))}-ны өдрийн төгсгөл хүртэл чатбот захиалга авч, дараа нь автоматаар хаана.`
+                    : 'Та өөрөө хаах хүртэл чатбот захиалга авна.'}
+                </Text>
+              )}
+            </View>
+
+            <TextField
+              label="Хэзээ ирэх вэ (заавал биш)"
+              placeholder="Жишээ: Захиалга хаагдсанаас хойш 2–3 долоо хоногт"
+              value={arrivalNote}
+              onChangeText={setArrivalNote}
+              maxLength={120}
+              hint="Чатбот захиалга авахдаа худалдан авагчид хэлнэ."
+            />
+
+            <TextField
+              label="Дээд тоо (заавал биш)"
+              placeholder="Хязгааргүй"
+              keyboardType="number-pad"
+              value={limit}
+              onChangeText={(text) => setLimit(digitsOnly(text, 5))}
+              error={errors.limit}
+              hint="Нийт захиалга энэ тоонд хүрэхэд чатбот захиалга авахаа зогсооно."
+              suffix={<Suffix>ш</Suffix>}
+            />
+
+            <DatePicker
+              visible={datePickerOpen}
+              value={closesOn}
+              min={todayKey}
+              onCancel={() => setDatePickerOpen(false)}
+              onApply={(day) => {
+                setDatePickerOpen(false);
+                setClosesOn(day);
+              }}
+            />
+          </>
+        )}
 
         {/* Code */}
         <View style={styles.section}>
@@ -354,10 +505,13 @@ export function ProductForm({ product }: { product?: Product }) {
             </View>
           ) : (
             <TextField
-              placeholder="000"
-              keyboardType="number-pad"
+              placeholder="ABC"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
               value={code}
-              onChangeText={(text) => setCode(digitsOnly(text, 3))}
+              onChangeText={(text) => setCode(normalizeProductCode(text))}
+              hint="Латин A–Z үсэг. Кирилл А, В, С… бичвэл латин болгон хувиргана."
               maxLength={3}
               error={errors.code}
               style={styles.codeInput}

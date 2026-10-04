@@ -52,7 +52,8 @@ export function Screen({
         contentContainerStyle={{
           flexGrow: fill ? 1 : undefined,
           paddingTop: header ? Spacing.two : insets.top + (isWide ? Spacing.ten : Spacing.five),
-          paddingBottom: Spacing.ten,
+          // Without a footer, keep the last content clear of the home indicator.
+          paddingBottom: Spacing.ten + (footer ? 0 : insets.bottom),
           paddingHorizontal: horizontal,
         }}>
         <View style={[styles.inner, { maxWidth }, fill && styles.flex, contentStyle]}>
