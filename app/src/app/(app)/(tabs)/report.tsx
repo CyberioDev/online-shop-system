@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { api, type Channel, type DateRange, type ReportSummary } from '@/api';
 import { DateRangePicker } from '@/components/date-range-picker';
@@ -11,7 +11,8 @@ import { Icon } from '@/components/ui/icon';
 import { LoadState } from '@/components/ui/load-state';
 import { Column, Columns, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
 import { exportOrders, type ExportFormat } from '@/lib/export/report-export';
 import { addDays, formatMoney, formatNumber, formatRangeShort, toDayKey } from '@/lib/format';
@@ -47,6 +48,8 @@ function presetRange(preset: Exclude<Preset, 'custom'>): DateRange {
 const ALL_CHANNELS: Channel[] = ['live', 'messenger', 'instagram', 'facebook'];
 
 export default function ReportScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const [preset, setPreset] = useState<Preset>('today');
   const [range, setRange] = useState<DateRange>(() => presetRange('today'));
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -66,7 +69,7 @@ export default function ReportScreen() {
     <Screen>
       <View style={styles.titleRow}>
         <Text variant="display">Тайлан</Text>
-        {loading && data && <ActivityIndicator color={Colors.primary} />}
+        {loading && data && <ActivityIndicator color={colors.primary} />}
       </View>
 
       <View style={styles.chips}>
@@ -121,6 +124,7 @@ export default function ReportScreen() {
 }
 
 function ChannelCard({ summary }: { summary: ReportSummary }) {
+  const styles = useStyles();
   const counts = new Map(summary.byChannel.map((c) => [c.channel, c.count]));
   const channels = ALL_CHANNELS.map((channel) => ({ channel, count: counts.get(channel) ?? 0 })).sort(
     (a, b) => b.count - a.count,
@@ -146,13 +150,15 @@ function ChannelCard({ summary }: { summary: ReportSummary }) {
 }
 
 function TopProductsCard({ summary }: { summary: ReportSummary }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Card padded={false}>
       <Text variant="heading" style={styles.cardTitle}>
         Шилдэг бараа
       </Text>
       {summary.topProducts.length === 0 ? (
-        <Text color={Colors.textSecondary} style={styles.emptyText}>
+        <Text color={colors.textSecondary} style={styles.emptyText}>
           Энэ хугацаанд борлуулалт алга.
         </Text>
       ) : (
@@ -161,7 +167,7 @@ function TopProductsCard({ summary }: { summary: ReportSummary }) {
             <Text variant="bodyMedium" style={styles.flex} numberOfLines={1}>
               {product.name}
             </Text>
-            <Text color={Colors.textSecondary}>
+            <Text color={colors.textSecondary}>
               {formatNumber(product.quantity)} ш ·{' '}
               <Text variant="bodyMedium">{formatMoney(product.revenue)}</Text>
             </Text>
@@ -173,21 +179,23 @@ function TopProductsCard({ summary }: { summary: ReportSummary }) {
 }
 
 function PendingCard({ summary }: { summary: ReportSummary }) {
+  const colors = useColors();
+  const styles = useStyles();
   if (summary.awaitingCount === 0 && summary.unmatchedPaymentCount === 0) return null;
   return (
     <Card tone="warning" padded={false}>
       {summary.awaitingCount > 0 && (
         <View style={styles.pendingRow}>
-          <Icon name="clock" size={18} color={Colors.warningText} />
-          <Text variant="label" color={Colors.warningText} style={styles.flex}>
+          <Icon name="clock" size={18} color={colors.warningText} />
+          <Text variant="label" color={colors.warningText} style={styles.flex}>
             {summary.awaitingCount} захиалгын төлбөр хүлээгдэж байна
           </Text>
         </View>
       )}
       {summary.unmatchedPaymentCount > 0 && (
         <View style={[styles.pendingRow, summary.awaitingCount > 0 && styles.warningDivider]}>
-          <Icon name="help-circle" size={18} color={Colors.warningText} />
-          <Text variant="label" color={Colors.warningText} style={styles.flex}>
+          <Icon name="help-circle" size={18} color={colors.warningText} />
+          <Text variant="label" color={colors.warningText} style={styles.flex}>
             {summary.unmatchedPaymentCount} захиалгагүй төлбөр
           </Text>
         </View>
@@ -197,6 +205,8 @@ function PendingCard({ summary }: { summary: ReportSummary }) {
 }
 
 function ExportCard({ range }: { range: DateRange }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [busy, setBusy] = useState<ExportFormat | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -221,7 +231,7 @@ function ExportCard({ range }: { range: DateRange }) {
     <Card style={styles.cardGap}>
       <View>
         <Text variant="heading">Тайлан татах</Text>
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           {formatRangeShort(range.from, range.to)} хугацааны бүх захиалга
         </Text>
       </View>
@@ -248,7 +258,7 @@ function ExportCard({ range }: { range: DateRange }) {
         />
       </View>
       {message && (
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           {message}
         </Text>
       )}
@@ -256,7 +266,7 @@ function ExportCard({ range }: { range: DateRange }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -291,13 +301,13 @@ const styles = StyleSheet.create({
   track: {
     height: 8,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     overflow: 'hidden',
   },
   bar: {
     height: '100%',
     borderRadius: Radius.pill,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   productRow: {
     flexDirection: 'row',
@@ -308,7 +318,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   emptyText: {
     paddingHorizontal: Spacing.five,
@@ -323,11 +333,11 @@ const styles = StyleSheet.create({
   },
   warningDivider: {
     borderTopWidth: 1,
-    borderTopColor: Colors.warningBorder,
+    borderTopColor: colors.warningBorder,
   },
   exportButtons: {
     flexDirection: 'row',
     gap: Spacing.three,
   },
-});
+}));
 

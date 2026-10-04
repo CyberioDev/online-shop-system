@@ -2,17 +2,18 @@ import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { api, type Integrations, type MetaPlatform } from '@/api';
-import { useAuth, useUser } from '@/auth/auth-context';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { LoadState } from '@/components/ui/load-state';
 import { Column, Columns, Screen } from '@/components/ui/screen';
+import { ScreenHeader } from '@/components/ui/screen-header';
 import { Text } from '@/components/ui/text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
 import { confirm } from '@/lib/confirm';
 import { errorMessage } from '@/lib/errors';
@@ -23,6 +24,8 @@ import { formatRelative, formatShortDate } from '@/lib/format';
 WebBrowser.maybeCompleteAuthSession();
 
 export default function IntegrationsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { data: integrations, error, reload, setData } = useResource(
     () => api.getIntegrations(),
     [],
@@ -30,9 +33,8 @@ export default function IntegrationsScreen() {
   useReloadOnFocus(reload);
 
   return (
-    <Screen>
-      <Text variant="display">Холболт</Text>
-      <Text color={Colors.textSecondary} style={styles.intro}>
+    <Screen header={<ScreenHeader title="Холболт" fallbackHref="/settings" />}>
+      <Text color={colors.textSecondary} style={styles.intro}>
         Холболтуудыг манай баг таны дэлгүүрт ирж тохируулж өгнө. Энд тэдгээрийн төлөвийг харна.
       </Text>
 
@@ -45,7 +47,6 @@ export default function IntegrationsScreen() {
           </Column>
           <Column>
             <MetaCard integrations={integrations} onChange={setData} />
-            <AccountCard />
           </Column>
         </Columns>
       )}
@@ -67,11 +68,13 @@ function MetaCard({
   integrations: Integrations;
   onChange: (next: Integrations) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Card padded={false}>
       <View style={styles.cardHeader}>
         <Text variant="title">Meta</Text>
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           Чат, коммент дээрх захиалгыг автоматаар хүлээн авна.
         </Text>
       </View>
@@ -96,6 +99,8 @@ function MetaRow({
   integrations: Integrations;
   onChange: (next: Integrations) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const connection = integrations[platform];
   const meta = META[platform];
   const [busy, setBusy] = useState(false);
@@ -132,20 +137,20 @@ function MetaRow({
   return (
     <View style={styles.metaRow}>
       <View style={styles.metaIcon}>
-        <Icon name={meta.icon} size={20} color={Colors.text} />
+        <Icon name={meta.icon} size={20} color={colors.text} />
       </View>
       <View style={styles.flex}>
         <View style={styles.inline}>
           <Text variant="bodyMedium">{meta.label}</Text>
           <StatusPill active={connection.connected} />
         </View>
-        <Text variant="caption" color={Colors.textSecondary} numberOfLines={2}>
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2}>
           {connection.connected
             ? `${connection.accountName}${connection.connectedAt ? ` · ${formatShortDate(new Date(connection.connectedAt))}-нд холбосон` : ''}`
             : meta.empty}
         </Text>
         {error && (
-          <Text variant="caption" color={Colors.danger}>
+          <Text variant="caption" color={colors.danger}>
             {error}
           </Text>
         )}
@@ -164,6 +169,8 @@ function MetaRow({
 // ---------- SMS listener ----------
 
 function SmsListenerCard({ integrations }: { integrations: Integrations }) {
+  const colors = useColors();
+  const styles = useStyles();
   const sms = integrations.sms;
   const [showToken, setShowToken] = useState(false);
   const sender = sms.senderNumber ?? 'банкны дугаар';
@@ -173,7 +180,7 @@ function SmsListenerCard({ integrations }: { integrations: Integrations }) {
       <View style={styles.titleRow}>
         <View style={styles.flex}>
           <Text variant="title">Банкны мессеж сонсогч</Text>
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             Утсанд ирсэн банкны SMS-ийг энэ хаяг руу дамжуулж, гүйлгээг захиалгатай тулгана.
           </Text>
         </View>
@@ -201,7 +208,7 @@ function SmsListenerCard({ integrations }: { integrations: Integrations }) {
             onPress={() => setShowToken((v) => !v)}
             hitSlop={8}
             style={styles.copyButton}>
-            <Icon name={showToken ? 'eye-off' : 'eye'} size={18} color={Colors.textSecondary} />
+            <Icon name={showToken ? 'eye-off' : 'eye'} size={18} color={colors.textSecondary} />
           </Pressable>
         }
       />
@@ -231,9 +238,11 @@ function SmsListenerCard({ integrations }: { integrations: Integrations }) {
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.fact}>
-      <Text color={Colors.textSecondary}>{label}</Text>
+      <Text color={colors.textSecondary}>{label}</Text>
       <Text variant="bodyMedium" style={styles.factValue} numberOfLines={1}>
         {value}
       </Text>
@@ -252,6 +261,8 @@ function CopyField({
   display?: string;
   extra?: ReactNode;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -262,7 +273,7 @@ function CopyField({
 
   return (
     <View style={styles.copyField}>
-      <Text variant="captionMedium" color={Colors.textSecondary}>
+      <Text variant="captionMedium" color={colors.textSecondary}>
         {label}
       </Text>
       <View style={styles.copyBox}>
@@ -279,7 +290,7 @@ function CopyField({
           <Icon
             name={copied ? 'check' : 'copy'}
             size={18}
-            color={copied ? Colors.primary : Colors.textSecondary}
+            color={copied ? colors.primary : colors.textSecondary}
           />
         </Pressable>
       </View>
@@ -296,6 +307,8 @@ function Disclosure({
   icon: IconName;
   children: ReactNode;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   return (
     <View style={styles.disclosure}>
@@ -304,11 +317,11 @@ function Disclosure({
         accessibilityState={{ expanded: open }}
         onPress={() => setOpen((v) => !v)}
         style={styles.disclosureHeader}>
-        <Icon name={icon} size={18} color={Colors.textSecondary} />
+        <Icon name={icon} size={18} color={colors.textSecondary} />
         <Text variant="label" style={styles.flex}>
           {title}
         </Text>
-        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={Colors.textSecondary} />
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
       </Pressable>
       {open && <View style={styles.disclosureBody}>{children}</View>}
     </View>
@@ -316,12 +329,14 @@ function Disclosure({
 }
 
 function Steps({ steps }: { steps: string[] }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.steps}>
       {steps.map((step, i) => (
         <View key={step} style={styles.step}>
           <View style={styles.stepNumber}>
-            <Text variant="captionMedium" color={Colors.primary}>
+            <Text variant="captionMedium" color={colors.primary}>
               {i + 1}
             </Text>
           </View>
@@ -335,42 +350,21 @@ function Steps({ steps }: { steps: string[] }) {
 }
 
 function StatusPill({ active, activeLabel = 'Холбогдсон' }: { active: boolean; activeLabel?: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
-    <View style={[styles.pill, { backgroundColor: active ? Colors.primarySoft : Colors.surfaceMuted }]}>
+    <View style={[styles.pill, { backgroundColor: active ? colors.primarySoft : colors.surfaceMuted }]}>
       <View
-        style={[styles.dot, { backgroundColor: active ? Colors.primary : Colors.textMuted }]}
+        style={[styles.dot, { backgroundColor: active ? colors.primary : colors.textMuted }]}
       />
-      <Text variant="captionMedium" color={active ? Colors.primary : Colors.textSecondary}>
+      <Text variant="captionMedium" color={active ? colors.primary : colors.textSecondary}>
         {active ? activeLabel : 'Холбогдоогүй'}
       </Text>
     </View>
   );
 }
 
-// ---------- Account ----------
-
-function AccountCard() {
-  const user = useUser();
-  const { signOut } = useAuth();
-
-  const logout = async () => {
-    if (await confirm('Гарах', 'Бүртгэлээсээ гарах уу?', 'Гарах')) await signOut();
-  };
-
-  return (
-    <Card style={styles.cardGap}>
-      <Text variant="title">Бүртгэл</Text>
-      <View style={styles.facts}>
-        <Fact label="Дэлгүүр" value={user.shopName} />
-        <Fact label="Нэр" value={user.name} />
-        <Fact label="Утас" value={`+976 ${user.phone}`} />
-      </View>
-      <Button title="Гарах" variant="danger" icon="log-out" size="md" onPress={logout} />
-    </Card>
-  );
-}
-
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -405,13 +399,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.five,
     paddingVertical: Spacing.four,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   metaIcon: {
     width: 40,
     height: 40,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -451,7 +445,7 @@ const styles = StyleSheet.create({
     paddingLeft: Spacing.four,
     paddingRight: Spacing.two,
     borderRadius: Radius.md,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
   },
   mono: {
     flex: 1,
@@ -466,7 +460,7 @@ const styles = StyleSheet.create({
   },
   disclosure: {
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     borderRadius: Radius.md,
   },
   disclosureHeader: {
@@ -491,8 +485,8 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

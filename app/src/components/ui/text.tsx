@@ -1,6 +1,7 @@
 import { StyleSheet, Text as RNText, type TextProps as RNTextProps } from 'react-native';
 
-import { Colors, Fonts } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
+import { useColors } from '@/theme';
 
 type Variant =
   | 'hero' // big numbers on summary cards
@@ -18,8 +19,9 @@ export type TextProps = RNTextProps & {
   color?: string;
 };
 
-export function Text({ variant = 'body', color = Colors.text, style, ...rest }: TextProps) {
-  return <RNText style={[styles[variant], { color }, style]} {...rest} />;
+export function Text({ variant = 'body', color, style, ...rest }: TextProps) {
+  const colors = useColors();
+  return <RNText style={[styles[variant], { color: color ?? colors.text }, style]} {...rest} />;
 }
 
 const styles = StyleSheet.create({

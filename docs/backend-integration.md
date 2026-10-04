@@ -109,7 +109,7 @@ The client times out after 20 s (60 s for image upload).
 
 | Screen | Calls |
 | --- | --- |
-| Login | `POST /auth/login` |
+| Login | `POST /auth/login`; "Нууц үг мартсан?" → `POST /auth/password-reset`, `POST /auth/password-reset/confirm` |
 | Өнөөдөр (home) | `GET /dashboard/today` |
 | Tab bar badge | `GET /review/summary` (on every navigation; keep it cheap) |
 | Шалгах inbox | `GET /review/cases`, `POST /review/cases/{id}/refunded` |
@@ -118,7 +118,12 @@ The client times out after 20 s (60 s for image upload).
 | Product form | `GET /products/{id}`, `POST /uploads/images`, `POST /products`, `PUT /products/{id}`, `DELETE /products/{id}` |
 | Preorder overview | `GET /products/{id}/preorder`, `POST /products/{id}/preorder/status` (Excel is built in the app) |
 | Тайлан | `GET /reports/summary?from&to`, `GET /orders?from&to` (Excel/CSV is built in the app) |
-| Холболт | `GET /integrations`, `POST /integrations/meta/{platform}/connect`, `DELETE /integrations/meta/{platform}` |
+| Захиалга (orders) | `GET /orders/search?view=&q=&cursor=`, `POST /orders/fulfillment` (bulk), Excel via repeated `/orders/search` |
+| Order detail | `GET /orders/{id}`, `PATCH /orders/{id}`, `POST /orders/fulfillment`, `POST /orders/{id}/cancel`, `POST /orders/{id}/restore`, `GET /products/{id}` (size options) |
+| Тохиргоо (settings) | `GET /settings`, `GET /integrations` (summary) |
+| Bank account | `GET /settings`, `PUT /settings/bank-account` |
+| Change password | `POST /auth/password` |
+| Холболт (from settings) | `GET /integrations`, `POST /integrations/meta/{platform}/connect`, `DELETE /integrations/meta/{platform}` |
 | Logout | `POST /auth/logout` |
 
 ## 4. Business rules the UI relies on
@@ -188,6 +193,37 @@ The flow the app's data reflects:
 Store the Messenger/Instagram conversation (PSID / IGSID) on each order. The app's
 **"message the buyer"** action (`POST /review/cases/{id}/contact`) sends into that
 conversation. Return `422` with a Mongolian `message` if the order has none.
+
+### Fulfilment (Захиалга tab)
+
+After payment the seller packs and hands over or ships the order, then marks it delivered.
+
+- The tab lists **confirmed** orders by `view`: `to_fulfill` (paid, `fulfilledAt` null; oldest
+  payment first, so nothing waits forever), `fulfilled`, `cancelled`. Paginate with an opaque
+  `cursor`; `total` counts all matches. The Excel export walks every page with `limit=200`.
+- `POST /orders/fulfillment` marks many at once (the list has checkboxes). It is all or nothing:
+  if any order isn't `paid`, return 409 and change none.
+- `PATCH /orders/{id}` edits delivery phone/address, a private note, and **size swaps**
+  (`itemVariants`). A swap must name an existing variant of the item's product; move one unit of
+  stock from the new size to the old one.
+- **Cancel** keeps `paidAt` so **restore** can return to `paid`; otherwise `awaiting_payment`.
+  Return stock on cancel and take it again on restore. Refunds stay manual (the app reminds the
+  seller). Refuse to cancel a `needs_review` order (409): its payment must be resolved first.
+- `chatUrl` should open the buyer's conversation directly (a Meta Business Suite inbox thread or
+  the Instagram DM thread), not a generic inbox. The demo uses generic inbox URLs.
+- The chatbot should collect `deliveryAddress` and `customerPhone` after payment, as in the
+  mockup ("Хүргэлтийн хаягаа бичнэ үү"). The list flags orders missing either.
+
+### Shop settings and passwords
+
+- `ShopSettings.bankAccount` is what the chatbot sends with each order (bank, account number,
+  holder name, then the amount and the order code). Until it is set, the app warns in settings.
+  The chatbot should refuse to take orders without it, or route them to the seller.
+- `POST /auth/password`: a wrong current password is **422**, not 401 (401 signs the user out).
+- Password reset: `POST /auth/password-reset` sends a 6-digit SMS code and always returns 200
+  with a masked number (no account discovery). `.../confirm` checks the code (expire after ~10
+  minutes, limit attempts) and revokes existing tokens. New passwords are at least 8 characters.
+  In demo mode the code is `123456` (`DEMO_RESET_CODE` in `app/src/constants/config.ts`).
 
 ### Payments and automatic matching
 
@@ -300,6 +336,8 @@ comments) that feed the chatbot are backend-only and not part of this contract.
 
 - `TEST_ACCOUNT` in `app/src/constants/config.ts` and the card marked `TEMPORARY` in
   `app/src/app/login.tsx`. The card is already hidden when `EXPO_PUBLIC_API_URL` is set.
+- `DEMO_RESET_CODE` in the same file and the matching `TEMPORARY` hint in
+  `app/src/app/reset-password.tsx` (also hidden outside demo mode).
 - The mock itself (`mock*.ts`) can stay for UI work and demos.
 
 ## 7. Open decisions for the backend

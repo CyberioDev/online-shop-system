@@ -3,13 +3,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   View,
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, PageMaxWidth, Spacing } from '@/constants/theme';
+import { PageMaxWidth, Spacing } from '@/constants/theme';
+import { makeStyles } from '@/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 
 /**
@@ -33,6 +33,7 @@ export function Screen({
   fill?: boolean;
   contentStyle?: ViewStyle;
 }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const isWide = useIsWide();
   const horizontal = isWide ? Spacing.ten : Spacing.five;
@@ -75,6 +76,7 @@ export function Screen({
 
 /** Lays children out side by side on wide screens and stacked on phones. */
 export function Columns({ children, gap = Spacing.four }: { children: ReactNode; gap?: number }) {
+  const styles = useStyles();
   const isWide = useIsWide();
   return (
     <View style={isWide ? [styles.columns, { gap: gap + Spacing.two }] : { gap }}>{children}</View>
@@ -83,15 +85,16 @@ export function Columns({ children, gap = Spacing.four }: { children: ReactNode;
 
 /** One column inside `Columns`. */
 export function Column({ children, gap = Spacing.four }: { children: ReactNode; gap?: number }) {
+  const styles = useStyles();
   const isWide = useIsWide();
   // Only flex side by side; stacked columns must size to their content.
   return <View style={[isWide && styles.column, { gap }]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   inner: {
     width: '100%',
@@ -102,9 +105,9 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingTop: Spacing.three,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   columns: {
     flexDirection: 'row',
@@ -114,4 +117,4 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-});
+}));

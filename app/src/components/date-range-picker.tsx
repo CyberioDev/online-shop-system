@@ -5,7 +5,8 @@ import type { DateRange } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import {
   WEEKDAYS_SHORT_MON_FIRST,
   formatMonthYear,
@@ -75,6 +76,7 @@ function CalendarModal({
   onCancel: () => void;
   children: ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
@@ -102,6 +104,8 @@ function Calendar({
   onCancel: () => void;
   onApply: (range: DateRange) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [start, setStart] = useState<string | null>(initial?.from ?? null);
   const [end, setEnd] = useState<string | null>(initial?.to ?? null);
   const shown = fromDayKey(initial?.to ?? min ?? toDayKey(new Date()));
@@ -162,7 +166,7 @@ function Calendar({
       <View style={styles.grid}>
         {WEEKDAYS_SHORT_MON_FIRST.map((day) => (
           <View key={day} style={styles.cell}>
-            <Text variant="captionMedium" color={Colors.textMuted}>
+            <Text variant="captionMedium" color={colors.textMuted}>
               {day}
             </Text>
           </View>
@@ -192,7 +196,7 @@ function Calendar({
                 <Text
                   variant={isStart || isEnd ? 'label' : 'body'}
                   color={
-                    outside ? Colors.border : isStart || isEnd ? Colors.textOnPrimary : Colors.text
+                    outside ? colors.border : isStart || isEnd ? colors.textOnPrimary : colors.text
                   }>
                   {fromDayKey(key).getDate()}
                 </Text>
@@ -202,7 +206,7 @@ function Calendar({
         })}
       </View>
 
-      <Text variant="caption" color={Colors.textSecondary} style={styles.summary}>
+      <Text variant="caption" color={colors.textSecondary} style={styles.summary}>
         {mode === 'single'
           ? start
             ? formatRangeShort(start, start)
@@ -238,6 +242,8 @@ function IconButton({
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -245,21 +251,21 @@ function IconButton({
       onPress={onPress}
       disabled={disabled}
       hitSlop={8}
-      style={({ pressed }) => [styles.iconButton, pressed && { backgroundColor: Colors.surfaceMuted }]}>
-      <Icon name={icon} size={22} color={disabled ? Colors.border : Colors.text} />
+      style={({ pressed }) => [styles.iconButton, pressed && { backgroundColor: colors.surfaceMuted }]}>
+      <Icon name={icon} size={22} color={disabled ? colors.border : colors.text} />
     </Pressable>
   );
 }
 
 const CELL = 44;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(28, 27, 24, 0.45)',
+    backgroundColor: colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: Spacing.five,
@@ -267,7 +273,7 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRadius: Radius.xl,
     padding: Spacing.five,
     gap: Spacing.three,
@@ -296,7 +302,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   band: {
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   bandStart: {
     borderTopLeftRadius: CELL / 2,
@@ -314,7 +320,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayEndpoint: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   summary: {
     textAlign: 'center',
@@ -323,4 +329,4 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.three,
   },
-});
+}));

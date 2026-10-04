@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { api, type ReviewCase } from '@/api';
 import { useCaseWorkspace } from '@/components/review/case-workspace';
@@ -12,7 +12,8 @@ import { LoadState } from '@/components/ui/load-state';
 import { Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useResource } from '@/hooks/use-resource';
 import { confirm } from '@/lib/confirm';
 import { errorMessage } from '@/lib/errors';
@@ -26,6 +27,7 @@ const MAX_WIDTH = 640;
  * set being reviewed in this session; it drives the progress bar and "next".
  */
 export default function ReviewCaseScreen() {
+  const colors = useColors();
   const { id, queue: queueParam } = useLocalSearchParams<{ id: string; queue?: string }>();
   const queue = queueParam ? queueParam.split(',').filter(Boolean) : [id];
   const position = Math.max(0, queue.indexOf(id));
@@ -52,7 +54,7 @@ export default function ReviewCaseScreen() {
         right={
           queue.length > 1 && data?.status === 'open' && !done ? (
             <Pressable accessibilityRole="button" onPress={advance} hitSlop={8}>
-              <Text variant="captionMedium" color={Colors.textSecondary}>
+              <Text variant="captionMedium" color={colors.textSecondary}>
                 Алгасах
               </Text>
             </Pressable>
@@ -104,6 +106,8 @@ function OpenCase({
 }
 
 function Progress({ current, total }: { current: number; total: number }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.progress} accessibilityLabel={`${total}-аас ${current}`}>
       <View style={styles.bars}>
@@ -111,7 +115,7 @@ function Progress({ current, total }: { current: number; total: number }) {
           <View key={i} style={[styles.bar, i < current && styles.barDone]} />
         ))}
       </View>
-      <Text variant="captionMedium" color={Colors.textSecondary}>
+      <Text variant="captionMedium" color={colors.textSecondary}>
         {current} / {total}
       </Text>
     </View>
@@ -119,14 +123,16 @@ function Progress({ current, total }: { current: number; total: number }) {
 }
 
 function DoneView({ remaining }: { remaining: number }) {
+  const colors = useColors();
+  const styles = useStyles();
   const back = () => (router.canGoBack() ? router.back() : router.replace('/review'));
   return (
     <Card style={styles.done}>
       <View style={styles.doneIcon}>
-        <Icon name="check" size={30} color={Colors.primary} />
+        <Icon name="check" size={30} color={colors.primary} />
       </View>
       <Text variant="title">{remaining > 0 ? 'Шийдвэрлэлээ' : 'Бүгд шалгагдлаа'}</Text>
-      <Text color={Colors.textSecondary} style={styles.center}>
+      <Text color={colors.textSecondary} style={styles.center}>
         {remaining > 0
           ? `Өөр ${remaining} төлбөр шалгах үлдсэн байна.`
           : 'Шалгах төлбөр үлдсэнгүй. Шинэ зөрүү гарвал энд харагдана.'}
@@ -150,6 +156,8 @@ function ResolvedCase({
   header: ReactNode;
   onChange: (next: ReviewCase) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [busy, setBusy] = useState<'refund' | 'reopen' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const r = c.resolution;
@@ -199,7 +207,7 @@ function ResolvedCase({
       footer={
         <View style={styles.footer}>
           {error && (
-            <Text variant="caption" color={Colors.danger} style={styles.center}>
+            <Text variant="caption" color={colors.danger} style={styles.center}>
               {error}
             </Text>
           )}
@@ -212,7 +220,7 @@ function ResolvedCase({
             disabled={c.refund?.status === 'done' || busy !== null}
           />
           {c.refund?.status === 'done' && (
-            <Text variant="caption" color={Colors.textSecondary} style={styles.center}>
+            <Text variant="caption" color={colors.textSecondary} style={styles.center}>
               Буцаалт хийгдсэн тул дахин нээх боломжгүй.
             </Text>
           )}
@@ -222,7 +230,7 @@ function ResolvedCase({
         <View style={styles.intro}>
           <Text variant="display">Шийдвэрлэсэн</Text>
           {r && (
-            <Text color={Colors.textSecondary}>
+            <Text color={colors.textSecondary}>
               {formatShortDate(new Date(r.resolvedAt))} · {formatTime(new Date(r.resolvedAt))}
             </Text>
           )}
@@ -230,13 +238,13 @@ function ResolvedCase({
 
         <Card tone="info" style={styles.gap}>
           <View style={styles.inline}>
-            <Icon name="check-circle" size={18} color={Colors.primary} />
-            <Text variant="bodyMedium" color={Colors.primary} style={styles.flex}>
+            <Icon name="check-circle" size={18} color={colors.primary} />
+            <Text variant="bodyMedium" color={colors.primary} style={styles.flex}>
               {resolutionLabel(c)}
             </Text>
           </View>
           {differenceText && (
-            <Text variant="caption" color={Colors.primary}>
+            <Text variant="caption" color={colors.primary}>
               {differenceText}
             </Text>
           )}
@@ -244,12 +252,12 @@ function ResolvedCase({
 
         {c.refund && (
           <Card tone={c.refund.status === 'pending' ? 'warning' : 'default'} style={styles.gap}>
-            <Text variant="label" color={c.refund.status === 'pending' ? Colors.warningText : Colors.text}>
+            <Text variant="label" color={c.refund.status === 'pending' ? colors.warningText : colors.text}>
               Буцаалт: {formatMoney(c.refund.amount)} → {c.payment.senderName}
             </Text>
             {c.refund.status === 'pending' ? (
               <>
-                <Text variant="caption" color={Colors.warningStrong}>
+                <Text variant="caption" color={colors.warningStrong}>
                   Банкны апп-аасаа буцааж шилжүүлээд энд тэмдэглэнэ үү.
                 </Text>
                 <Button
@@ -262,7 +270,7 @@ function ResolvedCase({
                 />
               </>
             ) : (
-              <Text variant="caption" color={Colors.textSecondary}>
+              <Text variant="caption" color={colors.textSecondary}>
                 Буцаасан{c.refund.doneAt ? ` · ${formatRelative(c.refund.doneAt)}` : ''}
               </Text>
             )}
@@ -274,7 +282,7 @@ function ResolvedCase({
         {c.contact && (
           <Card style={styles.gap}>
             <Text variant="label">Илгээсэн мессеж · {c.contact.customerName}</Text>
-            <Text variant="caption" color={Colors.textSecondary}>
+            <Text variant="caption" color={colors.textSecondary}>
               “{c.contact.message}”
             </Text>
           </Card>
@@ -283,7 +291,7 @@ function ResolvedCase({
         {c.note && (
           <Card style={styles.gap}>
             <Text variant="label">Тэмдэглэл</Text>
-            <Text color={Colors.textSecondary}>{c.note}</Text>
+            <Text color={colors.textSecondary}>{c.note}</Text>
           </Card>
         )}
       </View>
@@ -291,7 +299,7 @@ function ResolvedCase({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
   },
@@ -330,10 +338,10 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 6,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
   barDone: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   done: {
     alignItems: 'center',
@@ -345,7 +353,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -354,4 +362,4 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     marginTop: Spacing.three,
   },
-});
+}));

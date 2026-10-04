@@ -16,3 +16,14 @@ export function fail(code: ApiError['code'], message?: string): Promise<never> {
 
 let idCounter = 1000;
 export const newId = (prefix: string) => `${prefix}_${++idCounter}`;
+
+/** New-order values for the fields the seller fills in later. */
+export const ORDER_DEFAULTS = {
+  customerPhone: null,
+  deliveryAddress: null,
+  sellerNote: null,
+  fulfilledAt: null,
+  cancelledAt: null,
+  cancelReason: null,
+  chatUrl: null,
+} as const;

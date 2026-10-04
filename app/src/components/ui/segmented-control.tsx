@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Text } from './text';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 
 export function SegmentedControl<T extends string>({
   options,
@@ -13,6 +14,8 @@ export function SegmentedControl<T extends string>({
   value: T;
   onChange: (value: T) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.track} accessibilityRole="tablist">
       {options.map((option) => {
@@ -24,7 +27,7 @@ export function SegmentedControl<T extends string>({
             accessibilityState={{ selected }}
             onPress={() => onChange(option.value)}
             style={[styles.segment, selected && styles.selected]}>
-            <Text variant="label" color={selected ? Colors.text : Colors.textSecondary}>
+            <Text variant="label" color={selected ? colors.text : colors.textSecondary}>
               {option.label}
             </Text>
           </Pressable>
@@ -34,10 +37,10 @@ export function SegmentedControl<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   track: {
     flexDirection: 'row',
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: Radius.md,
     padding: Spacing.one,
     gap: Spacing.one,
@@ -51,7 +54,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
   },
   selected: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     boxShadow: '0 1px 2px rgba(28, 27, 24, 0.12)',
   },
-});
+}));

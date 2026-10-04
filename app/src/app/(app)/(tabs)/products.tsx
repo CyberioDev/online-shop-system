@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { api, type Product, type SaleType } from '@/api';
 import { PreorderStatusPill } from '@/components/preorder-status-pill';
@@ -13,7 +13,8 @@ import { LoadState } from '@/components/ui/load-state';
 import { Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
 import { errorMessage } from '@/lib/errors';
@@ -21,6 +22,8 @@ import { formatMoney, formatNumber, formatShortDate, fromDayKey } from '@/lib/fo
 import { describeStock, totalStock } from '@/lib/labels';
 
 export default function ProductsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const isWide = useIsWide();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<SaleType | 'all'>('all');
@@ -56,7 +59,7 @@ export default function ProductsScreen() {
         <LoadState error={error} onRetry={reload} />
       ) : (
         <View style={styles.body}>
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             {products.length} бараа · Үнийг харандаа дээр дарж шууд засна
           </Text>
 
@@ -84,7 +87,7 @@ export default function ProductsScreen() {
               autoCorrect={false}
               prefix={
                 <View style={styles.searchIcon}>
-                  <Icon name="search" size={18} color={Colors.textMuted} />
+                  <Icon name="search" size={18} color={colors.textMuted} />
                 </View>
               }
             />
@@ -92,14 +95,14 @@ export default function ProductsScreen() {
 
           {products.length === 0 ? (
             <Card style={styles.empty}>
-              <Icon name="box" size={28} color={Colors.textSecondary} />
+              <Icon name="box" size={28} color={colors.textSecondary} />
               <Text variant="title">Одоогоор бараа алга</Text>
-              <Text color={Colors.textSecondary} style={styles.center}>
+              <Text color={colors.textSecondary} style={styles.center}>
                 Эхний бараагаа нэмээд код авна уу.
               </Text>
             </Card>
           ) : visible.length === 0 ? (
-            <Text color={Colors.textSecondary} style={[styles.center, styles.noResults]}>
+            <Text color={colors.textSecondary} style={[styles.center, styles.noResults]}>
               {needle ? `«${query.trim()}» илэрц олдсонгүй.` : 'Энэ төрлийн бараа алга.'}
             </Text>
           ) : (
@@ -120,8 +123,8 @@ export default function ProductsScreen() {
           )}
 
           <Card tone="info" style={styles.tip}>
-            <Text variant="caption" color={Colors.primary} style={styles.tipText}>
-              Шинэ бараа нэмэхэд нэр, үнэ л хангалттай. Зураг заавал биш, кодыг систем өөрөө өгч
+            <Text variant="caption" color={colors.primary} style={styles.tipText}>
+              Шинэ бараа нэмэхэд нэр, үнэ л хангалттай. Зураг заавал шаардлагагүй, барааны кодыг систем автоматаар өгч
               болно.
             </Text>
           </Card>
@@ -138,6 +141,8 @@ function ProductCard({
   product: Product;
   onUpdated: (product: Product) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const isPreorder = product.saleType === 'preorder';
   const soldOut = !isPreorder && totalStock(product) === 0;
   const [editingPrice, setEditingPrice] = useState(false);
@@ -166,7 +171,7 @@ function ProductCard({
               onPress={() => setEditingPrice(true)}
               hitSlop={10}
               style={({ pressed }) => [styles.priceEdit, pressed && styles.priceEditPressed]}>
-              <Icon name="edit-2" size={14} color={Colors.textSecondary} />
+              <Icon name="edit-2" size={14} color={colors.textSecondary} />
             </Pressable>
           </View>
           {isPreorder ? (
@@ -176,7 +181,7 @@ function ProductCard({
           )}
         </View>
         <View style={styles.code}>
-          <Text variant="caption" color={Colors.textSecondary} style={styles.codeLabel}>
+          <Text variant="caption" color={colors.textSecondary} style={styles.codeLabel}>
             Код
           </Text>
           <Text style={styles.codeValue}>{product.code}</Text>
@@ -207,6 +212,8 @@ function PriceEditor({
   onClose: () => void;
   onSaved: (product: Product) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [price, setPrice] = useState(String(product.price));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -233,7 +240,7 @@ function PriceEditor({
 
   return (
     <View style={styles.priceEditor}>
-      <Text variant="captionMedium" color={Colors.textSecondary}>
+      <Text variant="captionMedium" color={colors.textSecondary}>
         Шинэ үнэ
       </Text>
       <View style={styles.priceEditorRow}>
@@ -247,7 +254,7 @@ function PriceEditor({
           returnKeyType="done"
           accessibilityLabel={`${product.name} шинэ үнэ`}
           suffix={
-            <Text color={Colors.textSecondary} style={styles.currency}>
+            <Text color={colors.textSecondary} style={styles.currency}>
               ₮
             </Text>
           }
@@ -261,11 +268,11 @@ function PriceEditor({
           disabled={saving}
           hitSlop={6}
           style={styles.cancel}>
-          <Icon name="x" size={20} color={Colors.textSecondary} />
+          <Icon name="x" size={20} color={colors.textSecondary} />
         </Pressable>
       </View>
       {error && (
-        <Text variant="caption" color={Colors.danger}>
+        <Text variant="caption" color={colors.danger}>
           {error}
         </Text>
       )}
@@ -275,6 +282,8 @@ function PriceEditor({
 
 /** Status and progress of a preorder instead of stock. */
 function PreorderLine({ product }: { product: Product }) {
+  const colors = useColors();
+  const styles = useStyles();
   const preorder = product.preorder;
   if (!preorder) return null;
   const counts = `Захиалсан ${preorder.ordered}${preorder.limit ? ` / ${preorder.limit}` : ''} ш · төлсөн ${preorder.paid}`;
@@ -285,7 +294,7 @@ function PreorderLine({ product }: { product: Product }) {
   return (
     <View style={styles.preorderLine}>
       <PreorderStatusPill status={preorder.status} prefix="Урьдчилсан" short />
-      <Text variant="caption" color={Colors.textSecondary}>
+      <Text variant="caption" color={colors.textSecondary}>
         {counts}
         {deadline}
       </Text>
@@ -294,20 +303,22 @@ function PreorderLine({ product }: { product: Product }) {
 }
 
 function StockLine({ product, soldOut }: { product: Product; soldOut: boolean }) {
+  const colors = useColors();
+  const styles = useStyles();
   return soldOut ? (
     <View style={styles.soldOut}>
-      <Text variant="captionMedium" color={Colors.danger}>
+      <Text variant="captionMedium" color={colors.danger}>
         Дууссан
       </Text>
     </View>
   ) : (
-    <Text variant="caption" color={Colors.textSecondary}>
+    <Text variant="caption" color={colors.textSecondary}>
       Үлдэгдэл: {describeStock(product)}
     </Text>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
   },
@@ -342,8 +353,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     overflow: 'hidden',
   },
   cardMain: {
@@ -363,17 +374,17 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
   },
   priceEditPressed: {
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
   priceEditor: {
     gap: Spacing.two,
     padding: Spacing.four,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    backgroundColor: Colors.background,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
   },
   priceEditorRow: {
     flexDirection: 'row',
@@ -390,7 +401,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardPressed: {
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
   },
   cardBody: {
     flex: 1,
@@ -404,7 +415,7 @@ const styles = StyleSheet.create({
   },
   soldOut: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.dangerSoft,
+    backgroundColor: colors.dangerSoft,
     borderRadius: Radius.pill,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.half,
@@ -416,7 +427,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.two,
     borderRadius: Radius.md,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
   },
   codeLabel: {
     fontSize: 12,
@@ -445,4 +456,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-});
+}));

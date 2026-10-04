@@ -2,7 +2,7 @@
  * Demo data and logic for payment review (шалгах). Seeds one case for each kind
  * of discrepancy and scores payment ↔ order matches the way the backend should.
  */
-import { fail, newId, respond } from './mock-utils';
+import { fail, newId, ORDER_DEFAULTS, respond } from './mock-utils';
 import type {
   BankPayment,
   CaseResolution,
@@ -59,6 +59,7 @@ export function createReviewMock(orders: Order[], products: Product[], now: Date
       createdAt: ago(createdMinutesAgo),
       paidAt: paidMinutesAgo === null ? null : ago(paidMinutesAgo),
       matchedBy,
+      ...ORDER_DEFAULTS,
     };
     orders.push(o);
     return o;
@@ -190,7 +191,8 @@ export function createReviewMock(orders: Order[], products: Product[], now: Date
         q
           ? o.customerName.toLowerCase().includes(q) ||
             (digits.length > 0 && (o.code.includes(digits) || String(o.total).startsWith(digits)))
-          : o.status !== 'paid' && new Date(o.createdAt).getTime() >= windowStart,
+          : (o.status === 'awaiting_payment' || o.status === 'needs_review') &&
+            new Date(o.createdAt).getTime() >= windowStart,
       )
       .map((o) => evaluate(p, o))
       .filter((scored) => q !== '' || scored.score >= 2)
@@ -252,6 +254,7 @@ export function createReviewMock(orders: Order[], products: Product[], now: Date
         const o = orders.find((x) => x.id === input.orderId);
         if (!o) return fail('not_found');
         if (o.status === 'paid') return fail('conflict', 'Энэ захиалга аль хэдийн төлөгдсөн байна');
+        if (o.status === 'cancelled') return fail('conflict', 'Энэ захиалга цуцлагдсан байна');
         const difference = c.payment.amount - o.total;
         const allowed: (DifferenceAction | null)[] =
           difference > 0 ? ['refund', 'keep'] : difference < 0 ? ['accept_short'] : [null];

@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 
 import { Icon, type IconName } from './icon';
 import { Text } from './text';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 
 /** Pill-shaped toggle, used for date presets and quick fills. */
 export function Chip({
@@ -17,7 +18,9 @@ export function Chip({
   icon?: IconName;
   onPress: () => void;
 }) {
-  const fg = selected ? Colors.textOnPrimary : Colors.text;
+  const colors = useColors();
+  const styles = useStyles();
+  const fg = selected ? colors.textOnPrimary : colors.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -26,7 +29,7 @@ export function Chip({
       style={({ pressed }) => [
         styles.chip,
         selected ? styles.selected : styles.idle,
-        pressed && !selected && { backgroundColor: Colors.surfaceMuted },
+        pressed && !selected && { backgroundColor: colors.surfaceMuted },
       ]}>
       {icon && <Icon name={icon} size={15} color={fg} />}
       <Text variant="captionMedium" color={fg}>
@@ -36,7 +39,7 @@ export function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -47,11 +50,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   idle: {
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   selected: {
-    backgroundColor: Colors.dark,
-    borderColor: Colors.dark,
+    backgroundColor: colors.dark,
+    borderColor: colors.dark,
   },
-});
+}));

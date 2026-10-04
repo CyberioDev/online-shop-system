@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { api, type ReviewCase } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { LoadState } from '@/components/ui/load-state';
 import { Column, Columns, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type Palette } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
 import { confirm } from '@/lib/confirm';
 import { formatMoney, formatRelative } from '@/lib/format';
@@ -16,6 +17,8 @@ import { genitive } from '@/lib/mongolian';
 import { openCase, reasonLabel, resolutionLabel, startReview } from '@/lib/review';
 
 export default function ReviewInboxScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { data: cases, error, loading, reload } = useResource(() => api.listReviewCases(), []);
   useReloadOnFocus(reload);
 
@@ -28,9 +31,9 @@ export default function ReviewInboxScreen() {
     <Screen>
       <View style={styles.titleRow}>
         <Text variant="display">Шалгах</Text>
-        {loading && cases && <ActivityIndicator color={Colors.primary} />}
+        {loading && cases && <ActivityIndicator color={colors.primary} />}
       </View>
-      <Text color={Colors.textSecondary} style={styles.subtitle}>
+      <Text color={colors.textSecondary} style={styles.subtitle}>
         Автоматаар тулгагдаагүй төлбөрүүдийг энд шалгаж, захиалгатай нь холбоно.
       </Text>
 
@@ -76,17 +79,19 @@ export default function ReviewInboxScreen() {
 }
 
 function StartCard({ count }: { count: number }) {
+  const colors = useColors();
+  const styles = useStyles();
   if (count === 0) {
     return (
       <Card tone="info" style={styles.startRow}>
-        <View style={[styles.startIcon, { backgroundColor: Colors.surface }]}>
-          <Icon name="check" size={22} color={Colors.primary} />
+        <View style={[styles.startIcon, { backgroundColor: colors.surface }]}>
+          <Icon name="check" size={22} color={colors.primary} />
         </View>
         <View style={styles.flex}>
-          <Text variant="title" color={Colors.primary}>
+          <Text variant="title" color={colors.primary}>
             Бүх төлбөр тулгагдсан
           </Text>
-          <Text variant="caption" color={Colors.primary}>
+          <Text variant="caption" color={colors.primary}>
             Шинэ зөрүү гарвал энд харагдана
           </Text>
         </View>
@@ -97,13 +102,13 @@ function StartCard({ count }: { count: number }) {
     <Card tone="warning" style={styles.startCard}>
       <View style={styles.startRow}>
         <View style={styles.startIcon}>
-          <Icon name="alert-circle" size={24} color={Colors.warningText} />
+          <Icon name="alert-circle" size={24} color={colors.warningText} />
         </View>
         <View style={styles.flex}>
-          <Text variant="title" color={Colors.warningText}>
+          <Text variant="title" color={colors.warningText}>
             {count} төлбөр шалгах
           </Text>
-          <Text variant="caption" color={Colors.warningStrong}>
+          <Text variant="caption" color={colors.warningStrong}>
             Нэг нэгээр нь харж баталгаажуулна
           </Text>
         </View>
@@ -126,13 +131,15 @@ function Section({
   tone?: 'default' | 'warning';
   children: ReactNode[];
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text variant="heading">{title}</Text>
         {count !== undefined && count > 0 && (
-          <View style={[styles.count, tone === 'warning' && { backgroundColor: Colors.warningSoft }]}>
-            <Text variant="captionMedium" color={tone === 'warning' ? Colors.warningText : Colors.textSecondary}>
+          <View style={[styles.count, tone === 'warning' && { backgroundColor: colors.warningSoft }]}>
+            <Text variant="captionMedium" color={tone === 'warning' ? colors.warningText : colors.textSecondary}>
               {count}
             </Text>
           </View>
@@ -140,7 +147,7 @@ function Section({
       </View>
       {children.length === 0 ? (
         empty ? (
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             {empty}
           </Text>
         ) : null
@@ -153,11 +160,11 @@ function Section({
   );
 }
 
-const statusLook: Record<ReviewCase['status'], { icon: IconName; color: string; bg: string }> = {
-  open: { icon: 'alert-circle', color: Colors.warningStrong, bg: Colors.warningSoft },
-  waiting_buyer: { icon: 'message-circle', color: Colors.textSecondary, bg: Colors.surfaceMuted },
-  resolved: { icon: 'check', color: Colors.primary, bg: Colors.primarySoft },
-};
+const statusLook = (colors: Palette): Record<ReviewCase['status'], { icon: IconName; color: string; bg: string }> => ({
+  open: { icon: 'alert-circle', color: colors.warningStrong, bg: colors.warningSoft },
+  waiting_buyer: { icon: 'message-circle', color: colors.textSecondary, bg: colors.surfaceMuted },
+  resolved: { icon: 'check', color: colors.primary, bg: colors.primarySoft },
+});
 
 function CaseRow({
   reviewCase: c,
@@ -168,7 +175,9 @@ function CaseRow({
   divider: boolean;
   onPress: () => void;
 }) {
-  const look = statusLook[c.status];
+  const colors = useColors();
+  const styles = useStyles();
+  const look = statusLook(colors)[c.status];
   const detail =
     c.status === 'resolved'
       ? resolutionLabel(c)
@@ -193,23 +202,23 @@ function CaseRow({
             {formatMoney(c.payment.amount)} · {c.payment.senderName}
           </Text>
         </View>
-        <Text variant="caption" color={Colors.textSecondary} numberOfLines={2}>
+        <Text variant="caption" color={colors.textSecondary} numberOfLines={2}>
           {detail}
         </Text>
         <View style={styles.rowMeta}>
           {c.status !== 'resolved' && (
             <View style={styles.reason}>
-              <Text variant="captionMedium" color={Colors.warningText} style={styles.reasonText}>
+              <Text variant="captionMedium" color={colors.warningText} style={styles.reasonText}>
                 {reasonLabel(c)}
               </Text>
             </View>
           )}
-          <Text variant="caption" color={Colors.textMuted} style={styles.reasonText}>
+          <Text variant="caption" color={colors.textMuted} style={styles.reasonText}>
             {formatRelative(c.payment.receivedAt)}
           </Text>
         </View>
       </View>
-      <Icon name="chevron-right" size={18} color={Colors.textMuted} />
+      <Icon name="chevron-right" size={18} color={colors.textMuted} />
     </Pressable>
   );
 }
@@ -223,6 +232,8 @@ function RefundRow({
   divider: boolean;
   onDone: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [busy, setBusy] = useState(false);
   if (!c.refund) return null;
   const amount = c.refund.amount;
@@ -246,10 +257,10 @@ function RefundRow({
   return (
     <View style={[styles.row, divider && styles.warningDivider]}>
       <Pressable accessibilityRole="button" onPress={() => openCase(c.id)} style={styles.flex}>
-        <Text variant="bodyMedium" color={Colors.warningText}>
+        <Text variant="bodyMedium" color={colors.warningText}>
           {formatMoney(amount)} → {c.payment.senderName}
         </Text>
-        <Text variant="caption" color={Colors.warningStrong} numberOfLines={1}>
+        <Text variant="caption" color={colors.warningStrong} numberOfLines={1}>
           {resolutionLabel(c)}
         </Text>
       </Pressable>
@@ -258,7 +269,7 @@ function RefundRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -288,7 +299,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.warningIconBg,
+    backgroundColor: colors.warningIconBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -304,7 +315,7 @@ const styles = StyleSheet.create({
     minWidth: 24,
     paddingHorizontal: Spacing.two,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
   },
   row: {
@@ -316,14 +327,14 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   warningDivider: {
     borderTopWidth: 1,
-    borderTopColor: Colors.warningBorder,
+    borderTopColor: colors.warningBorder,
   },
   pressed: {
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
   },
   rowIcon: {
     width: 40,
@@ -346,10 +357,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.two,
     paddingVertical: 1,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.warningSoft,
+    backgroundColor: colors.warningSoft,
   },
   reasonText: {
     fontSize: 12,
     lineHeight: 16,
   },
-});
+}));

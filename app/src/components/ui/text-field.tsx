@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { Text } from './text';
 
-import { Colors, Fonts, Radius, Spacing, webNoOutline } from '@/constants/theme';
+import { Fonts, Radius, Spacing, webNoOutline } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 
 export function TextField({
   label,
@@ -22,8 +23,10 @@ export function TextField({
   suffix?: ReactNode;
   containerStyle?: ViewStyle;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [focused, setFocused] = useState(false);
-  const borderColor = error ? Colors.danger : focused ? Colors.primary : Colors.borderStrong;
+  const borderColor = error ? colors.danger : focused ? colors.primary : colors.borderStrong;
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -31,7 +34,7 @@ export function TextField({
       <View style={[styles.field, { borderColor }]}>
         {prefix}
         <TextInput
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={colors.textMuted}
           {...inputProps}
           onFocus={(e) => {
             setFocused(true);
@@ -46,11 +49,11 @@ export function TextField({
         {suffix}
       </View>
       {error ? (
-        <Text variant="caption" color={Colors.danger}>
+        <Text variant="caption" color={colors.danger}>
           {error}
         </Text>
       ) : hint ? (
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           {hint}
         </Text>
       ) : null}
@@ -60,14 +63,16 @@ export function TextField({
 
 /** Fixed text shown at the start of a field, separated by a divider (e.g. "+976"). */
 export function FieldPrefix({ children }: { children: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.prefix}>
-      <Text color={Colors.textSecondary}>{children}</Text>
+      <Text color={colors.textSecondary}>{children}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   container: {
     gap: Spacing.two,
   },
@@ -77,7 +82,7 @@ const styles = StyleSheet.create({
     minHeight: 54,
     borderWidth: 1,
     borderRadius: Radius.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     overflow: 'hidden',
   },
   input: {
@@ -87,13 +92,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     fontFamily: Fonts.regular,
     fontSize: 17,
-    color: Colors.text,
+    color: colors.text,
   },
   prefix: {
     alignSelf: 'stretch',
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
     borderRightWidth: 1,
-    borderRightColor: Colors.border,
+    borderRightColor: colors.border,
   },
-});
+}));

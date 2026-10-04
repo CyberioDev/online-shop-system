@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
-import { Colors, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
+import { useColors } from '@/theme';
 import { formatMoney } from '@/lib/format';
 import { CHANNEL_LABELS } from '@/lib/labels';
 
@@ -29,6 +30,7 @@ export function MessageSheet({
   onSend: (message: string) => void;
   onClose: () => void;
 }) {
+  const colors = useColors();
   const [message, setMessage] = useState(initialMessage);
   const { order } = candidate;
 
@@ -46,7 +48,7 @@ export function MessageSheet({
           disabled={!message.trim()}
         />
       }>
-      <Text color={Colors.textSecondary}>
+      <Text color={colors.textSecondary}>
         Хэнд:{' '}
         <Text variant="bodyMedium">
           {order.customerName} · {CHANNEL_LABELS[order.channel]} · {order.code}
@@ -81,6 +83,7 @@ export function NoOrderSheet({
   onSubmit: (category: 'refund' | 'other_income', note: string) => void;
   onClose: () => void;
 }) {
+  const colors = useColors();
   const [category, setCategory] = useState<'refund' | 'other_income'>('refund');
   const [note, setNote] = useState(initialNote);
   const { payment } = reviewCase;
@@ -93,7 +96,7 @@ export function NoOrderSheet({
       footer={
         <Button title="Тэмдэглэх" onPress={() => onSubmit(category, note)} loading={busy} />
       }>
-      <Text color={Colors.textSecondary}>
+      <Text color={colors.textSecondary}>
         {formatMoney(payment.amount)} · {payment.senderName}. Энэ төлбөрийг юу гэж бүртгэх вэ?
       </Text>
       <View style={styles.choices}>

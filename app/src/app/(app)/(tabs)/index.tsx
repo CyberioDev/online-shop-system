@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { api, type Order } from '@/api';
 import { useUser } from '@/auth/auth-context';
@@ -10,13 +10,16 @@ import { Icon, type IconName } from '@/components/ui/icon';
 import { LoadState } from '@/components/ui/load-state';
 import { Column, Columns, Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing, type Palette } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
 import { formatLongDate, formatMoney, formatRelative } from '@/lib/format';
 import { CHANNEL_LABELS } from '@/lib/labels';
 import { startReview } from '@/lib/review';
 
 export default function HomeScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const user = useUser();
   const { data, error, reload } = useResource(() => api.getTodaySummary(), []);
   useReloadOnFocus(reload);
@@ -25,7 +28,7 @@ export default function HomeScreen() {
     <Screen>
       <View style={styles.header}>
         <View style={styles.flex}>
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             {formatLongDate(new Date())}
           </Text>
           <Text variant="title" style={styles.greeting}>
@@ -50,16 +53,16 @@ export default function HomeScreen() {
             />
             <ReviewCard count={data.reviewCount} />
             <View style={styles.stats}>
-              <StatTile value={data.paidCount} label="Баталгаажсан" color={Colors.primary} />
-              <StatTile value={data.awaitingCount} label="Төлбөр хүлээж буй" color={Colors.text} />
-              <StatTile value={data.reviewCount} label="Шалгах" color={Colors.warningStrong} />
+              <StatTile value={data.paidCount} label="Баталгаажсан" color={colors.primary} />
+              <StatTile value={data.awaitingCount} label="Төлбөр хүлээж буй" color={colors.text} />
+              <StatTile value={data.reviewCount} label="Шалгах" color={colors.warningStrong} />
             </View>
           </Column>
           <Column gap={Spacing.three}>
             <Text variant="heading">Сүүлийн үйлдэл</Text>
             <Card padded={false}>
               {data.recent.length === 0 ? (
-                <Text color={Colors.textSecondary} style={styles.empty}>
+                <Text color={colors.textSecondary} style={styles.empty}>
                   Өнөөдөр захиалга ороогүй байна.
                 </Text>
               ) : (
@@ -76,17 +79,19 @@ export default function HomeScreen() {
 }
 
 function ReviewCard({ count }: { count: number }) {
+  const colors = useColors();
+  const styles = useStyles();
   if (count === 0) {
     return (
       <Card tone="info" style={styles.reviewRow}>
-        <View style={[styles.reviewIcon, { backgroundColor: Colors.surface }]}>
-          <Icon name="check" size={22} color={Colors.primary} />
+        <View style={[styles.reviewIcon, { backgroundColor: colors.surface }]}>
+          <Icon name="check" size={22} color={colors.primary} />
         </View>
         <View style={styles.flex}>
-          <Text variant="title" color={Colors.primary}>
+          <Text variant="title" color={colors.primary}>
             Бүх төлбөр тулгагдсан
           </Text>
-          <Text variant="caption" color={Colors.primary}>
+          <Text variant="caption" color={colors.primary}>
             Шалгах төлбөр алга байна
           </Text>
         </View>
@@ -98,13 +103,13 @@ function ReviewCard({ count }: { count: number }) {
     <Card tone="warning" style={styles.reviewCard}>
       <View style={styles.reviewRow}>
         <View style={styles.reviewIcon}>
-          <Icon name="alert-circle" size={24} color={Colors.warningText} />
+          <Icon name="alert-circle" size={24} color={colors.warningText} />
         </View>
         <View style={styles.flex}>
-          <Text variant="title" color={Colors.warningText}>
+          <Text variant="title" color={colors.warningText}>
             {count} төлбөр шалгах
           </Text>
-          <Text variant="caption" color={Colors.warningStrong}>
+          <Text variant="caption" color={colors.warningStrong}>
             Бусад нь автоматаар тулгагдсан
           </Text>
         </View>
@@ -120,33 +125,40 @@ function ReviewCard({ count }: { count: number }) {
 }
 
 function StatTile({ value, label, color }: { value: number; label: string; color: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Card style={styles.stat}>
       <Text style={styles.statValue} color={color}>
         {value}
       </Text>
-      <Text variant="caption" color={Colors.textSecondary} style={styles.statLabel}>
+      <Text variant="caption" color={colors.textSecondary} style={styles.statLabel}>
         {label}
       </Text>
     </Card>
   );
 }
 
-const activityIcons: Record<Order['status'], { icon: IconName; color: string; bg: string }> = {
-  paid: { icon: 'check', color: Colors.primary, bg: Colors.primarySoft },
-  awaiting_payment: { icon: 'clock', color: Colors.textSecondary, bg: Colors.surfaceMuted },
-  needs_review: { icon: 'alert-circle', color: Colors.warningStrong, bg: Colors.warningSoft },
-};
+const activityIcons = (colors: Palette): Record<Order['status'], { icon: IconName; color: string; bg: string }> => ({
+  paid: { icon: 'check', color: colors.primary, bg: colors.primarySoft },
+  awaiting_payment: { icon: 'clock', color: colors.textSecondary, bg: colors.surfaceMuted },
+  needs_review: { icon: 'alert-circle', color: colors.warningStrong, bg: colors.warningSoft },
+  cancelled: { icon: 'x', color: colors.textMuted, bg: colors.surfaceMuted },
+});
 
 function ActivityRow({ order, divider }: { order: Order; divider: boolean }) {
-  const look = activityIcons[order.status];
+  const colors = useColors();
+  const styles = useStyles();
+  const look = activityIcons(colors)[order.status];
   const when = formatRelative(order.paidAt ?? order.createdAt);
   const detail =
     order.status === 'paid'
       ? `${CHANNEL_LABELS[order.channel]} · ${order.matchedBy === 'manual' ? 'гараар' : 'автоматаар'} баталгаажлаа · ${when}`
       : order.status === 'awaiting_payment'
         ? `Төлбөр хүлээж байна · ${when}`
-        : `Шалгах шаардлагатай · ${when}`;
+        : order.status === 'cancelled'
+          ? `Цуцалсан · ${when}`
+          : `Шалгах шаардлагатай · ${when}`;
 
   const content = (
     <>
@@ -157,7 +169,7 @@ function ActivityRow({ order, divider }: { order: Order; divider: boolean }) {
         <Text variant="bodyMedium">
           {order.customerName} · {formatMoney(order.total)}
         </Text>
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           {detail}
         </Text>
       </View>
@@ -165,20 +177,23 @@ function ActivityRow({ order, divider }: { order: Order; divider: boolean }) {
   );
 
   const rowStyle = [styles.activityRow, divider && styles.divider];
-  if (order.status !== 'needs_review') return <View style={rowStyle}>{content}</View>;
 
   return (
     <Pressable
       accessibilityRole="button"
-      onPress={() => router.push('/review')}
-      style={({ pressed }) => [rowStyle, pressed && { backgroundColor: Colors.surfaceMuted }]}>
+      onPress={() =>
+        order.status === 'needs_review'
+          ? router.push('/review')
+          : router.push({ pathname: '/order/[id]', params: { id: order.id } })
+      }
+      style={({ pressed }) => [rowStyle, pressed && { backgroundColor: colors.surfaceMuted }]}>
       {content}
-      <Icon name="chevron-right" size={18} color={Colors.textMuted} />
+      <Icon name="chevron-right" size={18} color={colors.textMuted} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -198,9 +213,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -216,7 +231,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.warningIconBg,
+    backgroundColor: colors.warningIconBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -249,7 +264,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   activityIcon: {
     width: 40,
@@ -262,4 +277,4 @@ const styles = StyleSheet.create({
     padding: Spacing.five,
     textAlign: 'center',
   },
-});
+}));

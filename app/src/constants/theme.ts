@@ -1,15 +1,18 @@
 import { Platform } from 'react-native';
 
 /**
- * Design tokens taken from the Tulgagch UI mockup. The app ships a single light
- * palette for now; keep every color here so a dark palette can be added later.
+ * Color palettes. The light palette comes from the Tulgagch UI mockup; the dark one keeps
+ * the same warm hue and green accent. Components read the active one with `useColors()`
+ * or `makeStyles()` from `@/theme`, never directly.
  */
-export const Colors = {
+const light = {
   background: '#F3EFE8',
   surface: '#FFFFFF',
   surfaceMuted: '#EEE8DE',
   border: '#E3DCCF',
   borderStrong: '#CFC6B6',
+  /** Dimmed layer behind modals and sheets. */
+  overlay: 'rgba(28, 27, 24, 0.45)',
 
   text: '#1C1B18',
   textSecondary: '#6B665C',
@@ -33,7 +36,46 @@ export const Colors = {
 
   dangerSoft: '#FBE1DE',
   danger: '#B3261E',
-} as const;
+};
+
+export type Palette = typeof light;
+export type ColorScheme = 'light' | 'dark';
+
+const dark: Palette = {
+  background: '#141513',
+  surface: '#1D1F1B',
+  surfaceMuted: '#2A2D27',
+  border: '#33372F',
+  borderStrong: '#4A4F45',
+  overlay: 'rgba(0, 0, 0, 0.6)',
+
+  text: '#EDEAE3',
+  textSecondary: '#ABA699',
+  textMuted: '#7D796F',
+  textOnPrimary: '#FFFFFF',
+
+  // Lighter than the light-mode green so it reads as text on dark surfaces,
+  // while white button labels on it stay legible.
+  primary: '#3E9472',
+  primaryPressed: '#347E61',
+  primarySoft: '#1F3A2F',
+  primaryFaint: '#192A22',
+  primaryOnDark: '#D3E9DD',
+
+  dark: '#2F322C',
+  darkPressed: '#3B3F37',
+
+  warningSoft: '#3A2E18',
+  warningBorder: '#5C4720',
+  warningIconBg: '#4E3B19',
+  warningText: '#F2D29A',
+  warningStrong: '#E6B35F',
+
+  dangerSoft: '#3D211D',
+  danger: '#F0907F',
+};
+
+export const Palettes: Record<ColorScheme, Palette> = { light, dark };
 
 export const Fonts = {
   display: 'Montserrat_800ExtraBold',

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { api, type Order, type PreorderDetail, type PreorderStatus } from '@/api';
 import { PreorderStatusPill } from '@/components/preorder-status-pill';
@@ -11,7 +11,8 @@ import { LoadState } from '@/components/ui/load-state';
 import { Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
 import { Text } from '@/components/ui/text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing, type Palette } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
 import { confirm } from '@/lib/confirm';
 import { errorMessage } from '@/lib/errors';
@@ -29,6 +30,7 @@ const BUYERS_PREVIEW = 12;
 
 /** Preorder overview: how many to order in bulk, who ordered, and the open → closed → arrived steps. */
 export default function PreorderScreen() {
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, error, reload, setData } = useResource(() => api.getPreorder(id), [id]);
   useReloadOnFocus(reload);
@@ -42,7 +44,7 @@ export default function PreorderScreen() {
           accessibilityRole="button"
           onPress={() => router.push({ pathname: '/product/[id]', params: { id } })}
           hitSlop={8}>
-          <Text variant="captionMedium" color={Colors.primary}>
+          <Text variant="captionMedium" color={colors.primary}>
             Засах
           </Text>
         </Pressable>
@@ -75,6 +77,8 @@ function PreorderView({
   header: ReactNode;
   onStatusChanged: (product: PreorderDetail['product']) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { product, tally, orders } = detail;
   const preorder = product.preorder!;
   const [busy, setBusy] = useState<'status' | 'export' | null>(null);
@@ -136,7 +140,7 @@ function PreorderView({
   const footer = (
     <View style={styles.footer}>
       {message && (
-        <Text variant="caption" color={Colors.danger} style={styles.center}>
+        <Text variant="caption" color={colors.danger} style={styles.center}>
           {message}
         </Text>
       )}
@@ -201,7 +205,7 @@ function PreorderView({
           <ProductThumb uri={product.imageUrl} size={72} />
           <View style={styles.productText}>
             <Text variant="title">{product.name}</Text>
-            <Text color={Colors.textSecondary}>
+            <Text color={colors.textSecondary}>
               {formatMoney(product.price)} · Код {product.code}
             </Text>
             <PreorderStatusPill status={preorder.status} />
@@ -238,18 +242,18 @@ function PreorderView({
 
         <View style={styles.stats}>
           <Stat value={`${totals.ordered} ш`} label="Нийт захиалсан" />
-          <Stat value={`${totals.paid} ш`} label="Төлсөн" color={Colors.primary} />
+          <Stat value={`${totals.paid} ш`} label="Төлсөн" color={colors.primary} />
           <Stat
             value={`${totals.ordered - totals.paid} ш`}
             label="Төлбөр хүлээж буй"
-            color={Colors.warningStrong}
+            color={colors.warningStrong}
           />
         </View>
 
         <Card style={styles.gap}>
           <View>
             <Text variant="heading">Бөөнөөр захиалах тоо</Text>
-            <Text variant="caption" color={Colors.textSecondary}>
+            <Text variant="caption" color={colors.textSecondary}>
               Төлсөн тоо = баталгаатай захиалга. Төлсөн орлого {formatMoney(paidRevenue)}.
             </Text>
           </View>
@@ -271,7 +275,7 @@ function PreorderView({
               </View>
               <View style={styles.tallyNumbers}>
                 <Text variant="bodyMedium">{row.ordered} ш</Text>
-                <Text variant="caption" color={Colors.textSecondary}>
+                <Text variant="caption" color={colors.textSecondary}>
                   төлсөн {row.paid}
                 </Text>
               </View>
@@ -288,7 +292,7 @@ function PreorderView({
         <View style={styles.gap}>
           <Text variant="heading">Захиалагчид ({orders.length})</Text>
           {orders.length === 0 ? (
-            <Text color={Colors.textSecondary}>Одоогоор захиалга ороогүй байна.</Text>
+            <Text color={colors.textSecondary}>Одоогоор захиалга ороогүй байна.</Text>
           ) : (
             <Card padded={false}>
               {(showAllBuyers ? orders : orders.slice(0, BUYERS_PREVIEW)).map((order, i) => (
@@ -311,6 +315,8 @@ function PreorderView({
 }
 
 function Stepper({ current }: { current: number }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.stepper} accessibilityLabel={`Алхам ${current + 1} / ${STEPS.length}`}>
       {STEPS.map((step, i) => {
@@ -320,7 +326,7 @@ function Stepper({ current }: { current: number }) {
             <View style={[styles.stepBar, done && styles.stepBarDone]} />
             <Text
               variant={i === current ? 'captionMedium' : 'caption'}
-              color={done ? Colors.primary : Colors.textMuted}
+              color={done ? colors.primary : colors.textMuted}
               style={styles.stepLabel}>
               {step.label}
             </Text>
@@ -332,9 +338,11 @@ function Stepper({ current }: { current: number }) {
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.spread}>
-      <Text color={Colors.textSecondary}>{label}</Text>
+      <Text color={colors.textSecondary}>{label}</Text>
       <Text variant="bodyMedium" style={styles.factValue}>
         {value}
       </Text>
@@ -342,36 +350,41 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Stat({ value, label, color = Colors.text }: { value: string; label: string; color?: string }) {
+function Stat({ value, label, color }: { value: string; label: string; color?: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Card style={styles.stat}>
       <Text style={styles.statValue} color={color}>
         {value}
       </Text>
-      <Text variant="caption" color={Colors.textSecondary} style={styles.statLabel}>
+      <Text variant="caption" color={colors.textSecondary} style={styles.statLabel}>
         {label}
       </Text>
     </Card>
   );
 }
 
-const orderStatusLook: Record<Order['status'], { label: string; bg: string; fg: string }> = {
-  paid: { label: 'Төлсөн', bg: Colors.primarySoft, fg: Colors.primary },
-  awaiting_payment: { label: 'Төлбөр хүлээж буй', bg: Colors.warningSoft, fg: Colors.warningText },
-  needs_review: { label: 'Шалгах', bg: Colors.warningSoft, fg: Colors.warningText },
-};
+const orderStatusLook = (colors: Palette): Record<Order['status'], { label: string; bg: string; fg: string }> => ({
+  paid: { label: 'Төлсөн', bg: colors.primarySoft, fg: colors.primary },
+  awaiting_payment: { label: 'Төлбөр хүлээж буй', bg: colors.warningSoft, fg: colors.warningText },
+  needs_review: { label: 'Шалгах', bg: colors.warningSoft, fg: colors.warningText },
+  cancelled: { label: 'Цуцалсан', bg: colors.surfaceMuted, fg: colors.textMuted },
+});
 
 function BuyerRow({ order, productId, divider }: { order: Order; productId: string; divider: boolean }) {
+  const colors = useColors();
+  const styles = useStyles();
   const items = order.items.filter((i) => i.productId === productId);
   const what = items.map((i) => `${i.variantName ? `${i.variantName} ` : ''}× ${i.quantity}`).join(', ');
-  const look = orderStatusLook[order.status];
+  const look = orderStatusLook(colors)[order.status];
   return (
     <View style={[styles.buyer, divider && styles.divider]}>
       <View style={styles.flex}>
         <Text variant="bodyMedium">
           {order.customerName} · {what}
         </Text>
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           {CHANNEL_LABELS[order.channel]} · {order.code} · {formatRelative(order.createdAt)}
         </Text>
       </View>
@@ -384,7 +397,7 @@ function BuyerRow({ order, productId, divider }: { order: Order; productId: stri
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -432,10 +445,10 @@ const styles = StyleSheet.create({
   stepBar: {
     height: 6,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.border,
+    backgroundColor: colors.border,
   },
   stepBarDone: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   stepLabel: {
     fontSize: 12,
@@ -448,13 +461,13 @@ const styles = StyleSheet.create({
   track: {
     height: 10,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
     overflow: 'hidden',
   },
   limitBar: {
     height: '100%',
     borderRadius: Radius.pill,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   stats: {
     flexDirection: 'row',
@@ -487,12 +500,12 @@ const styles = StyleSheet.create({
   orderedBar: {
     height: '100%',
     borderRadius: Radius.pill,
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
     overflow: 'hidden',
   },
   paidBar: {
     height: '100%',
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
   tallyNumbers: {
     width: 76,
@@ -501,7 +514,7 @@ const styles = StyleSheet.create({
   totalRow: {
     paddingTop: Spacing.three,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   buyer: {
     flexDirection: 'row',
@@ -512,7 +525,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   chip: {
     paddingHorizontal: Spacing.two,
@@ -523,4 +536,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-});
+}));

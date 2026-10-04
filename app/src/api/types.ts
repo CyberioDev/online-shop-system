@@ -124,7 +124,7 @@ export type PreorderDetail = {
 
 export type Channel = 'live' | 'messenger' | 'instagram' | 'facebook';
 
-export type OrderStatus = 'paid' | 'awaiting_payment' | 'needs_review';
+export type OrderStatus = 'paid' | 'awaiting_payment' | 'needs_review' | 'cancelled';
 
 export type OrderItem = {
   productId: string;
@@ -145,8 +145,66 @@ export type Order = {
   status: OrderStatus;
   createdAt: string;
   paidAt: string | null;
-  /** How the payment was matched to this order, once paid. */
+  /** How the payment was matched to this order, once paid. Kept if the order is cancelled. */
   matchedBy: 'auto' | 'manual' | null;
+  /** 8-digit phone the buyer gave (or the seller entered) for delivery. */
+  customerPhone: string | null;
+  /** Delivery address collected by the chatbot or entered by the seller. */
+  deliveryAddress: string | null;
+  /** Private note for the seller; never shown to the buyer. */
+  sellerNote: string | null;
+  /** When the seller marked a paid order as handed over / delivered. */
+  fulfilledAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  /** Link that opens this buyer's conversation (Messenger / Instagram inbox); null for live orders without a chat. */
+  chatUrl: string | null;
+};
+
+/**
+ * Order list views: `to_fulfill` = paid and not yet delivered (oldest payment first),
+ * `fulfilled` = paid and delivered (newest first), `cancelled` (newest first).
+ */
+export type OrderView = 'to_fulfill' | 'fulfilled' | 'cancelled';
+
+export type OrderSearch = {
+  view: OrderView;
+  /** Matches customer name, order code, phone or product name. */
+  q?: string;
+  /** Opaque cursor from the previous page's `nextCursor`. */
+  cursor?: string | null;
+  limit?: number;
+};
+
+export type OrderPage = {
+  orders: Order[];
+  /** Total orders in this view matching `q`, for counts. */
+  total: number;
+  nextCursor: string | null;
+};
+
+/** Fields the seller can edit on an order. Omitted fields stay unchanged. */
+export type OrderUpdate = {
+  customerPhone?: string | null;
+  deliveryAddress?: string | null;
+  sellerNote?: string | null;
+  /** New variant for each item, same order and length as `items` (size swaps). */
+  itemVariants?: (string | null)[];
+};
+
+// ---------- Shop settings ----------
+
+/** Where buyers transfer money; the chatbot sends this with every order. */
+export type BankAccount = {
+  bank: string;
+  /** Digits only (8–20), or a Mongolian IBAN "MN" + 18 digits. */
+  accountNumber: string;
+  /** Account holder name as the bank shows it. */
+  accountHolder: string;
+};
+
+export type ShopSettings = {
+  bankAccount: BankAccount | null;
 };
 
 export type DateRange = {
@@ -324,6 +382,14 @@ export interface ApiClient {
 
   login(phone: string, password: string): Promise<Session>;
   logout(): Promise<void>;
+  /** Wrong current password is a `validation` error (not 401, which would sign out). */
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
+  /** Sends a 6-digit code to the account's phone. Succeeds even for unknown numbers. */
+  requestPasswordReset(phone: string): Promise<{ sentTo: string }>;
+  confirmPasswordReset(phone: string, code: string, newPassword: string): Promise<void>;
+
+  getShopSettings(): Promise<ShopSettings>;
+  updateBankAccount(account: BankAccount): Promise<ShopSettings>;
 
   getTodaySummary(): Promise<TodaySummary>;
 
@@ -338,6 +404,15 @@ export interface ApiClient {
 
   getReport(range: DateRange): Promise<ReportSummary>;
   listOrders(range: DateRange): Promise<Order[]>;
+
+  searchOrders(search: OrderSearch): Promise<OrderPage>;
+  getOrder(id: string): Promise<Order>;
+  updateOrder(id: string, update: OrderUpdate): Promise<Order>;
+  /** Marks paid orders delivered (or undoes it). Returns the updated orders. */
+  setOrdersFulfilled(orderIds: string[], fulfilled: boolean): Promise<Order[]>;
+  cancelOrder(id: string, reason: string | null): Promise<Order>;
+  /** Undoes a cancellation: back to `paid` if it had been paid, else `awaiting_payment`. */
+  restoreOrder(id: string): Promise<Order>;
 
   getReviewSummary(): Promise<ReviewSummary>;
   /** Open and waiting cases plus recently resolved ones. */

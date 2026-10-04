@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from './icon';
 import { Text } from './text';
 
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 
 /** Modal panel: a bottom sheet on phones, a centered dialog on wide screens. */
@@ -22,6 +23,8 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const isWide = useIsWide();
   const insets = useSafeAreaInsets();
 
@@ -42,7 +45,7 @@ export function Sheet({
               {title}
             </Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Хаах" onPress={onClose} hitSlop={8}>
-              <Icon name="x" size={22} color={Colors.textSecondary} />
+              <Icon name="x" size={22} color={colors.textSecondary} />
             </Pressable>
           </View>
           <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
@@ -55,13 +58,13 @@ export function Sheet({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(28, 27, 24, 0.45)',
+    backgroundColor: colors.overlay,
   },
   bottom: {
     justifyContent: 'flex-end',
@@ -72,7 +75,7 @@ const styles = StyleSheet.create({
     padding: Spacing.six,
   },
   panel: {
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: Radius.xl,
     borderTopRightRadius: Radius.xl,
     padding: Spacing.five,
@@ -95,4 +98,4 @@ const styles = StyleSheet.create({
   bodyContent: {
     gap: Spacing.four,
   },
-});
+}));

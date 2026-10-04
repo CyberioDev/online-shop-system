@@ -28,6 +28,8 @@ export function orderStatusLabel(order: Order) {
       return 'Төлбөр хүлээж байна';
     case 'needs_review':
       return 'Шалгах шаардлагатай';
+    case 'cancelled':
+      return 'Цуцалсан';
   }
 }
 

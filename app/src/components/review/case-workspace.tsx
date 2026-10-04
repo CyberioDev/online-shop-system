@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { api, type MatchCandidate, type ResolveCaseInput, type ReviewCase } from '@/api';
 import { MessageSheet, NoOrderSheet } from '@/components/review/case-sheets';
@@ -15,7 +15,8 @@ import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useResource } from '@/hooks/use-resource';
 import { errorMessage } from '@/lib/errors';
 import { formatMoney, formatRelative } from '@/lib/format';
@@ -35,6 +36,8 @@ type SheetState =
  * `onDone` runs after the case was resolved or the buyer was messaged.
  */
 export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
+  const colors = useColors();
+  const styles = useStyles();
   const c = reviewCase;
   const suggestion = c.suggestion;
   const [mode, setMode] = useState<Mode>(suggestion ? 'confirm' : 'choose');
@@ -151,7 +154,7 @@ export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
         <Text variant="label">
           Дүнгийн зөрүү: {formatMoney(Math.abs(diff))} {diff > 0 ? 'илүү' : 'дутуу'}
         </Text>
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           Шилжүүлсэн {formatMoney(c.payment.amount)} · Захиалга {formatMoney(selected.order.total)}
         </Text>
         {diff > 0 ? (
@@ -207,21 +210,21 @@ export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
         <Text variant="display" style={styles.title}>
           {title}
         </Text>
-        <Text color={Colors.textSecondary}>{reasonDescription(c)}</Text>
+        <Text color={colors.textSecondary}>{reasonDescription(c)}</Text>
       </View>
 
       {c.contact && (
         <Card tone="info" style={styles.gap}>
           <View style={styles.inline}>
-            <Icon name="message-circle" size={16} color={Colors.primary} />
-            <Text variant="captionMedium" color={Colors.primary}>
+            <Icon name="message-circle" size={16} color={colors.primary} />
+            <Text variant="captionMedium" color={colors.primary}>
               Мессеж илгээсэн: {c.contact.customerName} · {formatRelative(c.contact.sentAt)}
             </Text>
           </View>
-          <Text variant="caption" color={Colors.primary}>
+          <Text variant="caption" color={colors.primary}>
             “{c.contact.message}”
           </Text>
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             Хариу ирсэн бол доороос шийдвэрлэнэ үү.
           </Text>
         </Card>
@@ -243,7 +246,7 @@ export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
           <View style={styles.gap}>
             <Text variant="label">Ойролцоо захиалгууд</Text>
             {nearby.length === 0 ? (
-              <Text variant="caption" color={Colors.textSecondary}>
+              <Text variant="caption" color={colors.textSecondary}>
                 Ойролцоо захиалга олдсонгүй. Доороос нэр, код эсвэл дүнгээр хайна уу.
               </Text>
             ) : (
@@ -266,17 +269,17 @@ export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
               autoCorrect={false}
               prefix={
                 <View style={styles.searchIcon}>
-                  <Icon name="search" size={18} color={Colors.textMuted} />
+                  <Icon name="search" size={18} color={colors.textMuted} />
                 </View>
               }
             />
             {debouncedQuery !== '' &&
               (search.loading ? (
-                <Text variant="caption" color={Colors.textSecondary}>
+                <Text variant="caption" color={colors.textSecondary}>
                   Хайж байна…
                 </Text>
               ) : searchResults.length === 0 ? (
-                <Text variant="caption" color={Colors.textSecondary}>
+                <Text variant="caption" color={colors.textSecondary}>
                   «{debouncedQuery}» илэрц олдсонгүй.
                 </Text>
               ) : (
@@ -309,7 +312,7 @@ export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
   // ---------- Footer ----------
 
   const footerNote = (text: string) => (
-    <Text variant="caption" color={Colors.textSecondary} style={styles.center}>
+    <Text variant="caption" color={colors.textSecondary} style={styles.center}>
       {text}
     </Text>
   );
@@ -378,7 +381,7 @@ export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
           accessibilityRole="button"
           onPress={() => setSheet({ kind: 'no_order' })}
           style={styles.footerLink}>
-          <Text variant="captionMedium" color={Colors.primary} style={styles.underline}>
+          <Text variant="captionMedium" color={colors.primary} style={styles.underline}>
             Захиалгагүй төлбөр гэж тэмдэглэх
           </Text>
         </Pressable>
@@ -390,8 +393,8 @@ export function useCaseWorkspace(reviewCase: ReviewCase, onDone: () => void) {
     <View style={styles.footer}>
       {error && !sheet && (
         <View style={styles.error}>
-          <Icon name="alert-circle" size={16} color={Colors.danger} />
-          <Text variant="caption" color={Colors.danger} style={styles.flex}>
+          <Icon name="alert-circle" size={16} color={colors.danger} />
+          <Text variant="caption" color={colors.danger} style={styles.flex}>
             {error}
           </Text>
         </View>
@@ -436,17 +439,19 @@ function LinkButton({
   label: string;
   onPress: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.link} hitSlop={6}>
-      <Icon name={icon} size={16} color={Colors.primary} />
-      <Text variant="captionMedium" color={Colors.primary}>
+      <Icon name={icon} size={16} color={colors.primary} />
+      <Text variant="captionMedium" color={colors.primary}>
         {label}
       </Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -508,6 +513,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Radius.sm,
-    backgroundColor: Colors.dangerSoft,
+    backgroundColor: colors.dangerSoft,
   },
-});
+}));

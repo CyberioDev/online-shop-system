@@ -10,6 +10,7 @@ import {
   type Integrations,
   type MatchCandidate,
   type Order,
+  type OrderPage,
   type PreorderDetail,
   type Product,
   type ProductInput,
@@ -17,6 +18,7 @@ import {
   type ReviewCase,
   type ReviewSummary,
   type Session,
+  type ShopSettings,
   type TodaySummary,
 } from './types';
 import { imageFormData } from './upload-form';
@@ -130,6 +132,15 @@ export function createHttpApi(baseUrl: string): ApiClient {
 
     login: (phone, password) => request<Session>('POST', '/auth/login', { phone, password }),
     logout: () => request<void>('POST', '/auth/logout'),
+    changePassword: (currentPassword, newPassword) =>
+      request<void>('POST', '/auth/password', { currentPassword, newPassword }),
+    requestPasswordReset: (phone) =>
+      request<{ sentTo: string }>('POST', '/auth/password-reset', { phone }),
+    confirmPasswordReset: (phone, code, newPassword) =>
+      request<void>('POST', '/auth/password-reset/confirm', { phone, code, newPassword }),
+
+    getShopSettings: () => request<ShopSettings>('GET', '/settings'),
+    updateBankAccount: (account) => request<ShopSettings>('PUT', '/settings/bank-account', account),
 
     getTodaySummary: () => request<TodaySummary>('GET', '/dashboard/today'),
 
@@ -147,6 +158,20 @@ export function createHttpApi(baseUrl: string): ApiClient {
 
     getReport: (r) => request<ReportSummary>('GET', `/reports/summary?${range(r)}`),
     listOrders: (r) => request<Order[]>('GET', `/orders?${range(r)}`),
+
+    searchOrders: ({ view, q, cursor, limit }) => {
+      const params = new URLSearchParams({ view });
+      if (q) params.set('q', q);
+      if (cursor) params.set('cursor', cursor);
+      if (limit) params.set('limit', String(limit));
+      return request<OrderPage>('GET', `/orders/search?${params}`);
+    },
+    getOrder: (id) => request<Order>('GET', `/orders/${id}`),
+    updateOrder: (id, update) => request<Order>('PATCH', `/orders/${id}`, update),
+    setOrdersFulfilled: (orderIds, fulfilled) =>
+      request<Order[]>('POST', '/orders/fulfillment', { orderIds, fulfilled }),
+    cancelOrder: (id, reason) => request<Order>('POST', `/orders/${id}/cancel`, { reason }),
+    restoreOrder: (id) => request<Order>('POST', `/orders/${id}/restore`),
 
     getReviewSummary: () => request<ReviewSummary>('GET', '/review/summary'),
     listReviewCases: () => request<ReviewCase[]>('GET', '/review/cases'),

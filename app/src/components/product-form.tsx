@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { api, ApiError, type Product, type ProductInput, type SaleType } from '@/api';
 import { DatePicker } from '@/components/date-range-picker';
@@ -14,7 +14,8 @@ import { ScreenHeader } from '@/components/ui/screen-header';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
 import { TextField } from '@/components/ui/text-field';
-import { Colors, FormMaxWidth, Radius, Spacing } from '@/constants/theme';
+import { FormMaxWidth, Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { confirm } from '@/lib/confirm';
 import { errorMessage } from '@/lib/errors';
 import { addDays, formatNumber, formatShortDate, fromDayKey, toDayKey } from '@/lib/format';
@@ -42,6 +43,8 @@ const digitsOnly = (text: string, max: number) => text.replace(/\D/g, '').slice(
 
 /** Add/edit product page. Pass `product` to edit an existing one. */
 export function ProductForm({ product }: { product?: Product }) {
+  const colors = useColors();
+  const styles = useStyles();
   const isEdit = !!product;
   const todayKey = toDayKey(new Date());
   // The sale type is fixed once the product exists (orders depend on it).
@@ -236,7 +239,7 @@ export function ProductForm({ product }: { product?: Product }) {
         <View style={styles.section}>
           <Text variant="label">Борлуулах хэлбэр</Text>
           {isEdit ? (
-            <Text color={Colors.textSecondary}>
+            <Text color={colors.textSecondary}>
               {isPreorder ? 'Урьдчилсан захиалга' : 'Бэлэн бараа'} · үүсгэсний дараа солих боломжгүй
             </Text>
           ) : (
@@ -249,7 +252,7 @@ export function ProductForm({ product }: { product?: Product }) {
                 value={saleType}
                 onChange={setSaleType}
               />
-              <Text variant="caption" color={Colors.textSecondary}>
+              <Text variant="caption" color={colors.textSecondary}>
                 {isPreorder
                   ? 'Захиалга цуглуулаад, хаагдсаны дараа гаднаас бөөнөөр захиална. Үлдэгдэл бүртгэхгүй, захиалсан тоог систем тоолно.'
                   : 'Гарт байгаа барааг үлдэгдлээр нь зарна.'}
@@ -269,7 +272,7 @@ export function ProductForm({ product }: { product?: Product }) {
           <View style={styles.imageActions}>
             <Text variant="label">
               Зураг{' '}
-              <Text variant="caption" color={Colors.textSecondary}>
+              <Text variant="caption" color={colors.textSecondary}>
                 (заавал биш)
               </Text>
             </Text>
@@ -325,7 +328,7 @@ export function ProductForm({ product }: { product?: Product }) {
           />
 
           {stockMode === 'single' && isPreorder ? (
-            <Text variant="caption" color={Colors.textSecondary}>
+            <Text variant="caption" color={colors.textSecondary}>
               Хэмжээ, төрөлгүй бараа. Захиалсан тоог систем тоолно.
             </Text>
           ) : stockMode === 'single' ? (
@@ -350,11 +353,11 @@ export function ProductForm({ product }: { product?: Product }) {
               </View>
 
               <View style={styles.variantHeader}>
-                <Text variant="captionMedium" color={Colors.textSecondary} style={styles.flex}>
+                <Text variant="captionMedium" color={colors.textSecondary} style={styles.flex}>
                   Хэмжээ / төрөл
                 </Text>
                 {!isPreorder && (
-                  <Text variant="captionMedium" color={Colors.textSecondary} style={styles.qtyCol}>
+                  <Text variant="captionMedium" color={colors.textSecondary} style={styles.qtyCol}>
                     Тоо ширхэг
                   </Text>
                 )}
@@ -385,7 +388,7 @@ export function ProductForm({ product }: { product?: Product }) {
                     accessibilityLabel="Мөр устгах"
                     onPress={() => setRows((current) => current.filter((r) => r.key !== row.key))}
                     style={({ pressed }) => [styles.removeCol, pressed && { opacity: 0.5 }]}>
-                    <Icon name="x" size={20} color={Colors.textSecondary} />
+                    <Icon name="x" size={20} color={colors.textSecondary} />
                   </Pressable>
                 </View>
               ))}
@@ -402,7 +405,7 @@ export function ProductForm({ product }: { product?: Product }) {
               </View>
 
               {errors.variants && (
-                <Text variant="caption" color={Colors.danger}>
+                <Text variant="caption" color={colors.danger}>
                   {errors.variants}
                 </Text>
               )}
@@ -440,11 +443,11 @@ export function ProductForm({ product }: { product?: Product }) {
                 />
               </View>
               {errors.closesOn ? (
-                <Text variant="caption" color={Colors.danger}>
+                <Text variant="caption" color={colors.danger}>
                   {errors.closesOn}
                 </Text>
               ) : (
-                <Text variant="caption" color={Colors.textSecondary}>
+                <Text variant="caption" color={colors.textSecondary}>
                   {closesOn
                     ? `${formatShortDate(fromDayKey(closesOn))}-ны өдрийн төгсгөл хүртэл чатбот захиалга авч, дараа нь автоматаар хаана.`
                     : 'Та өөрөө хаах хүртэл чатбот захиалга авна.'}
@@ -498,8 +501,8 @@ export function ProductForm({ product }: { product?: Product }) {
           />
           {codeMode === 'auto' ? (
             <View style={styles.autoCode}>
-              <Icon name="zap" size={18} color={Colors.primary} />
-              <Text variant="caption" color={Colors.primary} style={styles.flex}>
+              <Icon name="zap" size={18} color={colors.primary} />
+              <Text variant="caption" color={colors.primary} style={styles.flex}>
                 {autoCodeMessage}
               </Text>
             </View>
@@ -517,15 +520,15 @@ export function ProductForm({ product }: { product?: Product }) {
               style={styles.codeInput}
             />
           )}
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             Худалдан авагч чатад «{exampleCode} {exampleVariant}2ш» гэж бичээд захиална.
           </Text>
         </View>
 
         {errors.form && (
           <View style={styles.formError}>
-            <Icon name="alert-circle" size={18} color={Colors.danger} />
-            <Text variant="caption" color={Colors.danger} style={styles.flex}>
+            <Icon name="alert-circle" size={18} color={colors.danger} />
+            <Text variant="caption" color={colors.danger} style={styles.flex}>
               {errors.form}
             </Text>
           </View>
@@ -536,14 +539,16 @@ export function ProductForm({ product }: { product?: Product }) {
 }
 
 function Suffix({ children }: { children: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
-    <Text color={Colors.textSecondary} style={styles.suffix}>
+    <Text color={colors.textSecondary} style={styles.suffix}>
       {children}
     </Text>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -609,7 +614,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.four,
     borderRadius: Radius.md,
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   codeInput: {
     fontSize: 22,
@@ -621,7 +626,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Radius.sm,
-    backgroundColor: Colors.dangerSoft,
+    backgroundColor: colors.dangerSoft,
   },
   footer: {
     flexDirection: 'row',
@@ -630,4 +635,4 @@ const styles = StyleSheet.create({
   deleteButton: {
     paddingHorizontal: Spacing.five,
   },
-});
+}));

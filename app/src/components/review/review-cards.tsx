@@ -1,23 +1,26 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import type { BankPayment, MatchCandidate, MatchSignal, Order } from '@/api';
 import { Card } from '@/components/ui/card';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing, type Palette } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { formatMoney, formatRelative, formatTime } from '@/lib/format';
 import { CHANNEL_LABELS, describeItems } from '@/lib/labels';
 
 /** The bank transfer under review. */
 export function PaymentCard({ payment }: { payment: BankPayment }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [showRaw, setShowRaw] = useState(false);
 
   return (
     <Card style={styles.cardGap}>
       <View style={styles.spread}>
         <CardLabel icon="credit-card" text={`Банкнаас ирсэн · ${payment.bank}`} />
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           {formatTime(new Date(payment.receivedAt))}
         </Text>
       </View>
@@ -31,10 +34,10 @@ export function PaymentCard({ payment }: { payment: BankPayment }) {
         accessibilityState={{ expanded: showRaw }}
         onPress={() => setShowRaw((v) => !v)}
         style={styles.rawToggle}>
-        <Text variant="captionMedium" color={Colors.primary}>
+        <Text variant="captionMedium" color={colors.primary}>
           {showRaw ? 'Банкны мессеж нуух' : 'Банкны мессеж харах'}
         </Text>
-        <Icon name={showRaw ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.primary} />
+        <Icon name={showRaw ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} />
       </Pressable>
       {showRaw && (
         <View style={styles.raw}>
@@ -49,23 +52,25 @@ export function PaymentCard({ payment }: { payment: BankPayment }) {
 
 /** An order as the buyer placed it through chat or live selling. */
 export function OrderCard({ order }: { order: Order }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Card style={styles.cardGap}>
       <View style={styles.spread}>
         <CardLabel icon="message-square" text={`Захиалга · ${CHANNEL_LABELS[order.channel]}`} />
-        <Text variant="caption" color={Colors.textSecondary}>
+        <Text variant="caption" color={colors.textSecondary}>
           {formatTime(new Date(order.createdAt))}
         </Text>
       </View>
       <View style={styles.spread}>
         <Text variant="heading">{order.customerName}</Text>
-        <Text color={Colors.textSecondary}>Код {order.code}</Text>
+        <Text color={colors.textSecondary}>Код {order.code}</Text>
       </View>
-      <Text color={Colors.text}>{describeItems(order)}</Text>
+      <Text color={colors.text}>{describeItems(order)}</Text>
       {order.status === 'paid' && (
         <View style={styles.paidBadge}>
-          <Icon name="check" size={14} color={Colors.primary} />
-          <Text variant="captionMedium" color={Colors.primary}>
+          <Icon name="check" size={14} color={colors.primary} />
+          <Text variant="captionMedium" color={colors.primary}>
             Төлөгдсөн{order.paidAt ? ` · ${formatTime(new Date(order.paidAt))}` : ''}
           </Text>
         </View>
@@ -78,21 +83,23 @@ export function OrderCard({ order }: { order: Order }) {
   );
 }
 
-const signalLook: Record<MatchSignal['level'], { icon: IconName; color: string; bg: string }> = {
-  ok: { icon: 'check', color: Colors.primary, bg: Colors.primarySoft },
-  warn: { icon: 'alert-triangle', color: Colors.warningStrong, bg: Colors.warningSoft },
-  bad: { icon: 'x', color: Colors.danger, bg: Colors.dangerSoft },
-};
+const signalLook = (colors: Palette): Record<MatchSignal['level'], { icon: IconName; color: string; bg: string }> => ({
+  ok: { icon: 'check', color: colors.primary, bg: colors.primarySoft },
+  warn: { icon: 'alert-triangle', color: colors.warningStrong, bg: colors.warningSoft },
+  bad: { icon: 'x', color: colors.danger, bg: colors.dangerSoft },
+});
 
 /** "Яагаад таарч байна" evidence list. */
 export function SignalList({ signals, title }: { signals: MatchSignal[]; title?: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   const heading =
     title ?? (signals.some((s) => s.level === 'bad') ? 'Анхаарах зүйл' : 'Яагаад таарч байна');
   return (
     <View style={styles.signals}>
       <Text variant="label">{heading}</Text>
       {signals.map((signal) => {
-        const look = signalLook[signal.level];
+        const look = signalLook(colors)[signal.level];
         // Emphasise the detail after a colon: "Код буруу бичигдсэн: 4872 → 4827".
         const [lead, detail] = signal.text.split(/:\s(.+)/);
         return (
@@ -126,6 +133,8 @@ export function CandidateOption({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { order } = candidate;
   const meta = [CHANNEL_LABELS[order.channel], formatRelative(order.createdAt), candidate.summary]
     .filter(Boolean)
@@ -144,17 +153,17 @@ export function CandidateOption({
           <Text variant="bodyMedium">
             {order.customerName} · {formatMoney(order.total)}
           </Text>
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             {meta}
           </Text>
         </View>
-        <Text variant="caption" color={Colors.textMuted}>
+        <Text variant="caption" color={colors.textMuted}>
           {order.code}
         </Text>
       </View>
       {selected && (
         <View style={styles.optionDetail}>
-          <Text variant="caption" color={Colors.textSecondary}>
+          <Text variant="caption" color={colors.textSecondary}>
             {describeItems(order)}
           </Text>
           <SignalList signals={candidate.signals} />
@@ -176,6 +185,8 @@ export function ChoiceRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="radio"
@@ -187,7 +198,7 @@ export function ChoiceRow({
         <View style={styles.flex}>
           <Text variant="bodyMedium">{title}</Text>
           {description && (
-            <Text variant="caption" color={Colors.textSecondary}>
+            <Text variant="caption" color={colors.textSecondary}>
               {description}
             </Text>
           )}
@@ -198,6 +209,7 @@ export function ChoiceRow({
 }
 
 function Radio({ selected }: { selected: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.radio, selected && styles.radioSelected]}>
       {selected && <View style={styles.radioDot} />}
@@ -206,10 +218,12 @@ function Radio({ selected }: { selected: boolean }) {
 }
 
 function CardLabel({ icon, text }: { icon: IconName; text: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.cardLabel}>
-      <Icon name={icon} size={15} color={Colors.textSecondary} />
-      <Text variant="captionMedium" color={Colors.textSecondary}>
+      <Icon name={icon} size={15} color={colors.textSecondary} />
+      <Text variant="captionMedium" color={colors.textSecondary}>
         {text}
       </Text>
     </View>
@@ -217,12 +231,14 @@ function CardLabel({ icon, text }: { icon: IconName; text: string }) {
 }
 
 function Fact({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.spread}>
-      <Text color={Colors.textSecondary}>{label}</Text>
+      <Text color={colors.textSecondary}>{label}</Text>
       <Text
         variant={muted ? 'body' : 'bodyMedium'}
-        color={muted ? Colors.textMuted : Colors.text}
+        color={muted ? colors.textMuted : colors.text}
         style={styles.factValue}
         selectable>
         {value}
@@ -231,7 +247,7 @@ function Fact({ label, value, muted }: { label: string; value: string; muted?: b
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: {
     flex: 1,
     minWidth: 0,
@@ -272,7 +288,7 @@ const styles = StyleSheet.create({
   raw: {
     padding: Spacing.three,
     borderRadius: Radius.sm,
-    backgroundColor: Colors.surfaceMuted,
+    backgroundColor: colors.surfaceMuted,
   },
   rawText: {
     fontFamily: Fonts.medium,
@@ -285,12 +301,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.half,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   totalRow: {
     paddingTop: Spacing.three,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
   },
   signals: {
     gap: Spacing.three,
@@ -311,14 +327,14 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
     borderRadius: Radius.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     gap: Spacing.four,
   },
   optionSelected: {
     borderWidth: 2,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryFaint,
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryFaint,
     padding: Spacing.four - 1,
   },
   optionRow: {
@@ -335,17 +351,17 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: Colors.borderStrong,
+    borderColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioSelected: {
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
   },
   radioDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
   },
-});
+}));

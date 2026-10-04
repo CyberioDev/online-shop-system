@@ -1,6 +1,7 @@
 import * as Linking from 'expo-linking';
+import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '@/api';
@@ -12,7 +13,8 @@ import { Screen } from '@/components/ui/screen';
 import { Text } from '@/components/ui/text';
 import { FieldPrefix, TextField } from '@/components/ui/text-field';
 import { APP_NAME, SUPPORT_PHONE, TEST_ACCOUNT } from '@/constants/config';
-import { Colors, Fonts, FormMaxWidth, Spacing } from '@/constants/theme';
+import { Fonts, FormMaxWidth, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { errorMessage } from '@/lib/errors';
 
@@ -20,6 +22,8 @@ const HEADLINE = 'Захиалга, төлбөрөө нэг дороос';
 const TAGLINE = 'Чат болон шууд дамжуулалтын захиалгыг банкны гүйлгээтэй автоматаар тулгана.';
 
 export default function LoginScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const isWide = useIsWide();
   const insets = useSafeAreaInsets();
 
@@ -31,7 +35,7 @@ export default function LoginScreen() {
           <Text variant="display" style={styles.headline}>
             {HEADLINE}
           </Text>
-          <Text color={Colors.textSecondary} style={styles.tagline}>
+          <Text color={colors.textSecondary} style={styles.tagline}>
             {TAGLINE}
           </Text>
         </View>
@@ -45,17 +49,17 @@ export default function LoginScreen() {
       <View style={[styles.brandPanel, { paddingTop: insets.top + Spacing.ten }]}>
         <View style={styles.brandRow}>
           <View style={styles.brandLogo}>
-            <Icon name="check" size={24} color={Colors.primary} />
+            <Icon name="check" size={24} color={colors.primary} />
           </View>
-          <Text style={styles.brandName} color={Colors.textOnPrimary}>
+          <Text style={styles.brandName} color={colors.textOnPrimary}>
             {APP_NAME}
           </Text>
         </View>
         <View style={styles.brandCopy}>
-          <Text variant="display" color={Colors.textOnPrimary} style={styles.wideHeadline}>
+          <Text variant="display" color={colors.textOnPrimary} style={styles.wideHeadline}>
             {HEADLINE}
           </Text>
-          <Text color={Colors.primaryOnDark} style={styles.tagline}>
+          <Text color={colors.primaryOnDark} style={styles.tagline}>
             {TAGLINE}
           </Text>
         </View>
@@ -71,6 +75,8 @@ export default function LoginScreen() {
 }
 
 function LoginForm() {
+  const colors = useColors();
+  const styles = useStyles();
   const auth = useAuth();
   const { signIn } = auth;
   const [phone, setPhone] = useState('');
@@ -99,8 +105,8 @@ function LoginForm() {
     <View style={styles.form}>
       {auth.status === 'signedOut' && auth.expired && !errors.form && (
         <View style={styles.notice}>
-          <Icon name="clock" size={18} color={Colors.warningText} />
-          <Text variant="caption" color={Colors.warningText} style={styles.flex}>
+          <Icon name="clock" size={18} color={colors.warningText} />
+          <Text variant="caption" color={colors.warningText} style={styles.flex}>
             Нэвтрэх хугацаа дууссан тул дахин нэвтэрнэ үү.
           </Text>
         </View>
@@ -137,19 +143,29 @@ function LoginForm() {
             onPress={() => setShowPassword((v) => !v)}
             hitSlop={8}
             style={styles.eye}>
-            <Icon name={showPassword ? 'eye-off' : 'eye'} color={Colors.textSecondary} />
+            <Icon name={showPassword ? 'eye-off' : 'eye'} color={colors.textSecondary} />
           </Pressable>
         }
       />
 
       {errors.form && (
         <View style={styles.formError}>
-          <Icon name="alert-circle" size={18} color={Colors.danger} />
-          <Text variant="caption" color={Colors.danger} style={styles.flex}>
+          <Icon name="alert-circle" size={18} color={colors.danger} />
+          <Text variant="caption" color={colors.danger} style={styles.flex}>
             {errors.form}
           </Text>
         </View>
       )}
+
+      <Pressable
+        accessibilityRole="link"
+        onPress={() => router.push({ pathname: '/reset-password', params: phone ? { phone } : {} })}
+        hitSlop={8}
+        style={styles.forgot}>
+        <Text variant="captionMedium" color={colors.primary}>
+          Нууц үг мартсан?
+        </Text>
+      </Pressable>
 
       <Button title="Нэвтрэх" onPress={submit} loading={submitting} />
 
@@ -157,10 +173,10 @@ function LoginForm() {
       {api.isMock && (
         <View style={styles.testAccount}>
           <View style={styles.flex}>
-            <Text variant="captionMedium" color={Colors.primary}>
+            <Text variant="captionMedium" color={colors.primary}>
               Туршилтын бүртгэл
             </Text>
-            <Text variant="caption" color={Colors.primary}>
+            <Text variant="caption" color={colors.primary}>
               Утас: {TEST_ACCOUNT.phone.slice(0, 4)} {TEST_ACCOUNT.phone.slice(4)} · Нууц үг:{' '}
               {TEST_ACCOUNT.password}
             </Text>
@@ -179,11 +195,11 @@ function LoginForm() {
       )}
 
       {SUPPORT_PHONE !== '' && (
-        <Text variant="caption" color={Colors.textSecondary} style={styles.center}>
+        <Text variant="caption" color={colors.textSecondary} style={styles.center}>
           Тусламж хэрэгтэй юу?{' '}
           <Text
             variant="captionMedium"
-            color={Colors.primary}
+            color={colors.primary}
             style={styles.link}
             onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}>
             Зөвлөхтэйгөө ярих
@@ -194,7 +210,7 @@ function LoginForm() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   mobileContent: {
     gap: Spacing.ten,
   },
@@ -225,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.three,
     borderRadius: 12,
-    backgroundColor: Colors.dangerSoft,
+    backgroundColor: colors.dangerSoft,
   },
   flex: {
     flex: 1,
@@ -233,13 +249,17 @@ const styles = StyleSheet.create({
   center: {
     textAlign: 'center',
   },
+  forgot: {
+    alignSelf: 'flex-end',
+    marginTop: -Spacing.two,
+  },
   notice: {
     flexDirection: 'row',
     gap: Spacing.two,
     alignItems: 'center',
     padding: Spacing.three,
     borderRadius: 12,
-    backgroundColor: Colors.warningSoft,
+    backgroundColor: colors.warningSoft,
   },
   testAccount: {
     flexDirection: 'row',
@@ -247,7 +267,7 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
     padding: Spacing.four,
     borderRadius: 14,
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   link: {
     textDecorationLine: 'underline',
@@ -255,12 +275,12 @@ const styles = StyleSheet.create({
   split: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   brandPanel: {
     flex: 1,
     maxWidth: 620,
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: Spacing.ten + Spacing.four,
     paddingBottom: Spacing.ten,
     justifyContent: 'space-between',
@@ -274,7 +294,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -301,4 +321,4 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     gap: Spacing.eight,
   },
-});
+}));

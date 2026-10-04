@@ -1,16 +1,19 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { APP_NAME } from '@/constants/config';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 
 export function BrandMark({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
+  const colors = useColors();
+  const styles = useStyles();
   const box = size === 'lg' ? 48 : 36;
   return (
     <View style={styles.row}>
       <View style={[styles.logo, { width: box, height: box, borderRadius: box * 0.28 }]}>
-        <Icon name="check" size={box * 0.5} color={Colors.textOnPrimary} />
+        <Icon name="check" size={box * 0.5} color={colors.textOnPrimary} />
       </View>
       <Text style={{ fontFamily: Fonts.display, fontSize: size === 'lg' ? 22 : 17 }}>
         {APP_NAME}
@@ -19,16 +22,16 @@ export function BrandMark({ size = 'lg' }: { size?: 'lg' | 'sm' }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
   },
   logo: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: Radius.md,
   },
-});
+}));

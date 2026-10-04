@@ -11,3 +11,6 @@ export const SUPPORT_PHONE = '';
  * Remove (together with the hint in `login.tsx`) once real accounts exist.
  */
 export const TEST_ACCOUNT = { phone: '99996666', password: 'admintest' } as const;
+
+/** TEMPORARY: password-reset code the demo API accepts (no SMS is sent in demo mode). */
+export const DEMO_RESET_CODE = '123456';

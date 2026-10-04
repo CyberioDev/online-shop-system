@@ -3,18 +3,22 @@ import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from '
 import { Icon, type IconName } from './icon';
 import { Text } from './text';
 
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
+import type { Palette } from '@/constants/theme';
+import { useColors } from '@/theme';
 
 type Variant = 'primary' | 'dark' | 'outline' | 'ghost' | 'danger';
 type Size = 'lg' | 'md' | 'sm';
 
-const palette: Record<Variant, { bg: string; pressed: string; fg: string; border?: string }> = {
-  primary: { bg: Colors.primary, pressed: Colors.primaryPressed, fg: Colors.textOnPrimary },
-  dark: { bg: Colors.dark, pressed: Colors.darkPressed, fg: Colors.textOnPrimary },
-  outline: { bg: Colors.surface, pressed: Colors.surfaceMuted, fg: Colors.text, border: Colors.border },
-  ghost: { bg: 'transparent', pressed: Colors.surfaceMuted, fg: Colors.primary },
-  danger: { bg: Colors.surface, pressed: Colors.dangerSoft, fg: Colors.danger, border: Colors.border },
-};
+const variantColors = (
+  colors: Palette,
+): Record<Variant, { bg: string; pressed: string; fg: string; border?: string }> => ({
+  primary: { bg: colors.primary, pressed: colors.primaryPressed, fg: colors.textOnPrimary },
+  dark: { bg: colors.dark, pressed: colors.darkPressed, fg: colors.textOnPrimary },
+  outline: { bg: colors.surface, pressed: colors.surfaceMuted, fg: colors.text, border: colors.border },
+  ghost: { bg: 'transparent', pressed: colors.surfaceMuted, fg: colors.primary },
+  danger: { bg: colors.surface, pressed: colors.dangerSoft, fg: colors.danger, border: colors.border },
+});
 
 const heights: Record<Size, number> = { lg: 56, md: 46, sm: 38 };
 
@@ -39,7 +43,7 @@ export function Button({
   disabled?: boolean;
   style?: ViewStyle;
 }) {
-  const colors = palette[variant];
+  const tone = variantColors(useColors())[variant];
   const inactive = disabled || loading;
   const fontSize = size === 'lg' ? 17 : size === 'md' ? 15 : 14;
 
@@ -53,23 +57,23 @@ export function Button({
         styles.base,
         {
           height: heights[size],
-          backgroundColor: pressed ? colors.pressed : colors.bg,
-          borderColor: colors.border ?? 'transparent',
-          borderWidth: colors.border ? 1 : 0,
+          backgroundColor: pressed ? tone.pressed : tone.bg,
+          borderColor: tone.border ?? 'transparent',
+          borderWidth: tone.border ? 1 : 0,
           paddingHorizontal: size === 'sm' ? Spacing.three : Spacing.five,
           opacity: disabled ? 0.5 : 1,
         },
         style,
       ]}>
       {loading ? (
-        <ActivityIndicator color={colors.fg} />
+        <ActivityIndicator color={tone.fg} />
       ) : (
         <View style={styles.content}>
-          {icon && <Icon name={icon} size={fontSize + 2} color={colors.fg} />}
-          <Text style={{ fontFamily: Fonts.bold, fontSize }} color={colors.fg} numberOfLines={1}>
+          {icon && <Icon name={icon} size={fontSize + 2} color={tone.fg} />}
+          <Text style={{ fontFamily: Fonts.bold, fontSize }} color={tone.fg} numberOfLines={1}>
             {title}
           </Text>
-          {iconRight && <Icon name={iconRight} size={fontSize + 2} color={colors.fg} />}
+          {iconRight && <Icon name={iconRight} size={fontSize + 2} color={tone.fg} />}
         </View>
       )}
     </Pressable>

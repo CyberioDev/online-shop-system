@@ -2,14 +2,15 @@ import { StyleSheet, View } from 'react-native';
 
 import type { PreorderStatus } from '@/api';
 import { Text } from '@/components/ui/text';
-import { Colors, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, type Palette } from '@/constants/theme';
+import { useColors } from '@/theme';
 import { PREORDER_STATUS_LABELS, PREORDER_STATUS_SHORT } from '@/lib/labels';
 
-const look: Record<PreorderStatus, { bg: string; fg: string }> = {
-  open: { bg: Colors.primarySoft, fg: Colors.primary },
-  closed: { bg: Colors.warningSoft, fg: Colors.warningText },
-  arrived: { bg: Colors.surfaceMuted, fg: Colors.textSecondary },
-};
+const lookFor = (colors: Palette): Record<PreorderStatus, { bg: string; fg: string }> => ({
+  open: { bg: colors.primarySoft, fg: colors.primary },
+  closed: { bg: colors.warningSoft, fg: colors.warningText },
+  arrived: { bg: colors.surfaceMuted, fg: colors.textSecondary },
+});
 
 export function PreorderStatusPill({
   status,
@@ -20,9 +21,10 @@ export function PreorderStatusPill({
   prefix?: string;
   short?: boolean;
 }) {
+  const look = lookFor(useColors())[status];
   return (
-    <View style={[styles.pill, { backgroundColor: look[status].bg }]}>
-      <Text variant="captionMedium" color={look[status].fg} style={styles.text}>
+    <View style={[styles.pill, { backgroundColor: look.bg }]}>
+      <Text variant="captionMedium" color={look.fg} style={styles.text}>
         {prefix ? `${prefix} · ` : ''}
         {(short ? PREORDER_STATUS_SHORT : PREORDER_STATUS_LABELS)[status]}
       </Text>

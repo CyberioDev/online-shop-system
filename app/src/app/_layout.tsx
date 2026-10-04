@@ -6,27 +6,15 @@ import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Montserrat_700Bold } from '@expo-google-fonts/montserrat/700Bold';
 import { Montserrat_800ExtraBold } from '@expo-google-fonts/montserrat/800ExtraBold';
 import { useFonts } from 'expo-font';
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationTheme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { AuthProvider, useAuth } from '@/auth/auth-context';
-import { Colors } from '@/constants/theme';
+import { ThemeProvider, useTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
-
-const navigationTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    primary: Colors.primary,
-    background: Colors.background,
-    card: Colors.surface,
-    text: Colors.text,
-    border: Colors.border,
-  },
-};
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
@@ -39,18 +27,18 @@ export default function RootLayout() {
   });
 
   return (
-    <ThemeProvider value={navigationTheme}>
+    <ThemeProvider>
       <AuthProvider>
         <RootNavigator fontsReady={fontsLoaded || !!fontError} />
       </AuthProvider>
-      <StatusBar style="dark" />
     </ThemeProvider>
   );
 }
 
 function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   const { status } = useAuth();
-  const ready = fontsReady && status !== 'loading';
+  const { scheme, colors, ready: themeReady } = useTheme();
+  const ready = fontsReady && themeReady && status !== 'loading';
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
@@ -58,14 +46,32 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
 
   if (!ready) return null;
 
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.surface,
+      text: colors.text,
+      border: colors.border,
+    },
+  };
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={status === 'signedIn'}>
-        <Stack.Screen name="(app)" />
-      </Stack.Protected>
-      <Stack.Protected guard={status === 'signedOut'}>
-        <Stack.Screen name="login" />
-      </Stack.Protected>
-    </Stack>
+    <NavigationTheme value={navigationTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Protected guard={status === 'signedIn'}>
+          <Stack.Screen name="(app)" />
+        </Stack.Protected>
+        <Stack.Protected guard={status === 'signedOut'}>
+          <Stack.Screen name="login" />
+        </Stack.Protected>
+        {/* Reachable signed out ("forgot password") and signed in (from settings). */}
+        <Stack.Screen name="reset-password" />
+      </Stack>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+    </NavigationTheme>
   );
 }

@@ -28,6 +28,7 @@ tags:
   - name: Orders & reports
   - name: Review
     description: Payments that automatic matching could not link to an order (шалгах).
+  - name: Settings
   - name: Integrations
   - name: Webhooks
     description: Called by the shop's phone or by Meta, never by the app.
@@ -74,6 +75,80 @@ paths:
       responses:
         '204': { description: Signed out }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Change the signed-in user's password
+      description: |
+        A wrong `currentPassword` is **422 `validation`** (not 401, which would sign the user out).
+        Other sessions of the user may be revoked; keep the calling session valid.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '204': { description: Changed }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Validation' }
+
+  /auth/password-reset:
+    post:
+      tags: [Auth]
+      operationId: requestPasswordReset
+      summary: Send a password-reset code to the account's phone
+      description: |
+        Sends a 6-digit code by SMS. Always answers 200 (even for unknown numbers) so the endpoint
+        can't be used to discover accounts. Rate-limit per phone and per IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, pattern: '^\d{8}$' }
+      responses:
+        '200':
+          description: Code sent (or silently ignored)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sentTo]
+                properties:
+                  sentTo: { type: string, example: '+976 99** **66', description: Masked phone shown to the user. }
+
+  /auth/password-reset/confirm:
+    post:
+      tags: [Auth]
+      operationId: confirmPasswordReset
+      summary: Set a new password with the reset code
+      description: Wrong or expired code is 422 with a Mongolian `message`. Revoke the user's existing tokens.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code, newPassword]
+              properties:
+                phone: { type: string, pattern: '^\d{8}$' }
+                code: { type: string, pattern: '^\d{6}$' }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '204': { description: Password set }
+        '422': { $ref: '#/components/responses/Validation' }
 
   /dashboard/today:
     get:
@@ -289,6 +364,150 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '422': { $ref: '#/components/responses/Validation' }
 
+  /orders/search:
+    get:
+      tags: [Orders & reports]
+      operationId: searchOrders
+      summary: Confirmed-order list for the Захиалга tab
+      parameters:
+        - name: view
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/OrderView' }
+        - name: q
+          in: query
+          description: Matches customer name, order code, phone or product name.
+          schema: { type: string }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /orders/fulfillment:
+    post:
+      tags: [Orders & reports]
+      operationId: setOrdersFulfilled
+      summary: Mark paid orders delivered, or undo it (bulk)
+      description: |
+        `fulfilled: true` sets `fulfilledAt` to now (keeps an existing one); `false` clears it.
+        Any order that isn't `paid` makes the whole call 409 with nothing changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderIds, fulfilled]
+              properties:
+                orderIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: string }
+                fulfilled: { type: boolean }
+      responses:
+        '200':
+          description: The updated orders, in request order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Orders & reports]
+      operationId: getOrder
+      summary: One order
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Orders & reports]
+      operationId: updateOrder
+      summary: Edit delivery details, note, or swap item sizes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderUpdate' }
+      responses:
+        '200':
+          description: Updated order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Validation' }
+
+  /orders/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders & reports]
+      operationId: cancelOrder
+      summary: Cancel an order
+      description: |
+        Sets `status: cancelled`, `cancelledAt`, `cancelReason`, clears `fulfilledAt`; keeps
+        `paidAt`. Returns stock for stock products. A `needs_review` order is 409 (resolve its
+        review case first); an already-cancelled order is 409. Refunding a paid order is manual.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, nullable: true, maxLength: 200 }
+      responses:
+        '200':
+          description: Cancelled order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{id}/restore:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders & reports]
+      operationId: restoreOrder
+      summary: Undo a cancellation
+      description: Back to `paid` if `paidAt` is set, else `awaiting_payment`. 409 if not cancelled.
+      responses:
+        '200':
+          description: Restored order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /reports/summary:
     get:
       operationId: getReport
@@ -472,6 +691,38 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+
+  /settings:
+    get:
+      tags: [Settings]
+      operationId: getShopSettings
+      summary: Shop settings (bank account)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /settings/bank-account:
+    put:
+      tags: [Settings]
+      operationId: updateBankAccount
+      summary: Set the account buyers pay into
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BankAccount' }
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Validation' }
 
   /integrations:
     get:
@@ -854,8 +1105,32 @@ components:
 
     Order:
       type: object
-      required: [id, code, customerName, channel, items, total, status, createdAt, paidAt, matchedBy]
+      required:
+        [id, code, customerName, channel, items, total, status, createdAt, paidAt, matchedBy,
+         customerPhone, deliveryAddress, sellerNote, fulfilledAt, cancelledAt, cancelReason, chatUrl]
       properties:
+        customerPhone: { type: string, nullable: true, pattern: '^\d{8}$', description: Delivery phone the buyer gave or the seller entered. }
+        deliveryAddress: { type: string, nullable: true, description: Collected by the chatbot or entered by the seller. }
+        sellerNote: { type: string, nullable: true, description: Private seller note; never sent to the buyer. }
+        fulfilledAt:
+          type: string
+          nullable: true
+          description: When the seller marked the paid order delivered / handed over.
+          allOf:
+            - $ref: '#/components/schemas/Timestamp'
+        cancelledAt:
+          type: string
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Timestamp'
+        cancelReason: { type: string, nullable: true }
+        chatUrl:
+          type: string
+          nullable: true
+          format: uri
+          description: |
+            Opens this buyer's conversation (Messenger / Instagram / Meta Business inbox). Null when
+            there is no chat, e.g. live-selling orders.
         id: { type: string }
         code:
           type: string
@@ -869,8 +1144,10 @@ components:
         total: { $ref: '#/components/schemas/Money' }
         status:
           type: string
-          enum: [awaiting_payment, needs_review, paid]
-          description: '`needs_review` = a payment probably for this order is waiting in an open review case.'
+          enum: [awaiting_payment, needs_review, paid, cancelled]
+          description: |
+            `needs_review` = a payment probably for this order is waiting in an open review case.
+            `cancelled` keeps `paidAt`/`matchedBy`, so a restore knows whether it had been paid.
         createdAt: { $ref: '#/components/schemas/Timestamp' }
         paidAt:
           type: string
@@ -881,6 +1158,60 @@ components:
           type: string
           nullable: true
           enum: [auto, manual, null]
+
+    OrderView:
+      type: string
+      enum: [to_fulfill, fulfilled, cancelled]
+      description: |
+        `to_fulfill` = paid, not delivered (oldest payment first); `fulfilled` = paid and delivered
+        (newest delivery first); `cancelled` (newest first).
+
+    OrderPage:
+      type: object
+      required: [orders, total, nextCursor]
+      properties:
+        orders:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        total: { type: integer, description: Orders in the view matching `q` (all pages). }
+        nextCursor: { type: string, nullable: true, description: Pass as `cursor` for the next page; null on the last page. }
+
+    OrderUpdate:
+      type: object
+      description: Only the fields present are changed.
+      properties:
+        customerPhone: { type: string, nullable: true, pattern: '^\d{8}$' }
+        deliveryAddress: { type: string, nullable: true, maxLength: 300 }
+        sellerNote: { type: string, nullable: true, maxLength: 500 }
+        itemVariants:
+          type: array
+          description: |
+            Size swap: the new `variantName` for every item, same order and length as `items`.
+            Each name must be a variant of that item's product (422 otherwise). Adjust stock for
+            the old and new size accordingly.
+          items: { type: string, nullable: true }
+
+    BankAccount:
+      type: object
+      required: [bank, accountNumber, accountHolder]
+      properties:
+        bank: { type: string, example: Хаан банк }
+        accountNumber:
+          type: string
+          pattern: '^(MN\d{18}|\d{8,20})$'
+          description: Digits only, or a Mongolian IBAN. The app strips spaces and uppercases before sending.
+        accountHolder: { type: string, minLength: 1, description: Name as the bank shows it to the sender. }
+
+    ShopSettings:
+      type: object
+      required: [bankAccount]
+      properties:
+        bankAccount:
+          description: Sent by the chatbot with every order. Null until the shop sets it up.
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/BankAccount'
 
     TodaySummary:
       type: object

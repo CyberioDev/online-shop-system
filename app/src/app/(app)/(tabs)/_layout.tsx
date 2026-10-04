@@ -1,7 +1,7 @@
 import { usePathname } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, Tabs, type TabTriggerSlotProps } from 'expo-router/ui';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type ViewProps } from 'react-native';
+import { Pressable, View, type ViewProps } from 'react-native';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '@/api';
@@ -9,7 +9,8 @@ import { useUser } from '@/auth/auth-context';
 import { BrandMark } from '@/components/brand-mark';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { Colors, Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { makeStyles, useColors } from '@/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
 import { useResource } from '@/hooks/use-resource';
 
@@ -18,6 +19,7 @@ import { useResource } from '@/hooks/use-resource';
  * Both come from the same `TabList`, which only changes position and styling.
  */
 export default function TabsLayout() {
+  const styles = useStyles();
   const isWide = useIsWide();
   // Refetch the open-case count on every navigation so the badge stays current.
   const pathname = usePathname();
@@ -36,6 +38,11 @@ export default function TabsLayout() {
             Шалгах
           </NavButton>
         </TabTrigger>
+        <TabTrigger name="orders" href="/orders" asChild>
+          <NavButton icon="shopping-bag" isWide={isWide}>
+            Захиалга
+          </NavButton>
+        </TabTrigger>
         <TabTrigger name="products" href="/products" asChild>
           <NavButton icon="box" isWide={isWide}>
             Бараа
@@ -46,9 +53,9 @@ export default function TabsLayout() {
             Тайлан
           </NavButton>
         </TabTrigger>
-        <TabTrigger name="integrations" href="/integrations" asChild>
-          <NavButton icon="link-2" isWide={isWide}>
-            Холболт
+        <TabTrigger name="settings" href="/settings" asChild>
+          <NavButton icon="settings" isWide={isWide}>
+            Тохиргоо
           </NavButton>
         </TabTrigger>
       </NavContainer>
@@ -80,6 +87,7 @@ function ContentInsets({ isWide, children }: { isWide: boolean; children: ReactN
 }
 
 function NavContainer({ isWide, children, ...props }: ViewProps & { isWide: boolean }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
 
   if (!isWide) {
@@ -102,13 +110,15 @@ function NavContainer({ isWide, children, ...props }: ViewProps & { isWide: bool
 }
 
 function SidebarFooter() {
+  const colors = useColors();
+  const styles = useStyles();
   const user = useUser();
   return (
     <View style={styles.sidebarFooter}>
       <Text variant="label" numberOfLines={1}>
         {user.shopName}
       </Text>
-      <Text variant="caption" color={Colors.textSecondary}>
+      <Text variant="caption" color={colors.textSecondary}>
         +976 {user.phone}
       </Text>
     </View>
@@ -129,10 +139,12 @@ function NavButton({
   badge?: number;
   children: ReactNode;
 }) {
-  const color = isFocused ? Colors.primary : Colors.textSecondary;
+  const colors = useColors();
+  const styles = useStyles();
+  const color = isFocused ? colors.primary : colors.textSecondary;
   const badgeView = badge ? (
     <View style={[styles.badge, !isWide && styles.badgeOnIcon]}>
-      <Text style={styles.badgeText} color={Colors.textOnPrimary}>
+      <Text style={styles.badgeText} color={colors.textOnPrimary}>
         {badge > 99 ? '99+' : badge}
       </Text>
     </View>
@@ -156,7 +168,7 @@ function NavButton({
       </View>
       <Text
         variant={isFocused ? 'captionMedium' : 'caption'}
-        color={isFocused ? Colors.primary : Colors.textSecondary}
+        color={isFocused ? colors.primary : colors.textSecondary}
         style={isWide ? styles.sideLabel : styles.topLabel}>
         {children}
       </Text>
@@ -165,10 +177,10 @@ function NavButton({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   rootWide: {
     flexDirection: 'row',
@@ -181,7 +193,7 @@ const styles = StyleSheet.create({
     height: 20,
     paddingHorizontal: 5,
     borderRadius: Radius.pill,
-    backgroundColor: Colors.warningStrong,
+    backgroundColor: colors.warningStrong,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 'auto',
@@ -192,7 +204,7 @@ const styles = StyleSheet.create({
     right: -12,
     marginLeft: 0,
     borderWidth: 2,
-    borderColor: Colors.surface,
+    borderColor: colors.surface,
     height: 22,
     minWidth: 22,
   },
@@ -203,9 +215,9 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: colors.border,
   },
   topItem: {
     flex: 1,
@@ -218,7 +230,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   topItemActive: {
-    borderBottomColor: Colors.primary,
+    borderBottomColor: colors.primary,
   },
   topLabel: {
     fontSize: 12,
@@ -226,9 +238,9 @@ const styles = StyleSheet.create({
   },
   sidebar: {
     width: 248,
-    backgroundColor: Colors.surface,
+    backgroundColor: colors.surface,
     borderRightWidth: 1,
-    borderRightColor: Colors.border,
+    borderRightColor: colors.border,
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.six,
   },
@@ -249,7 +261,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   sideItemActive: {
-    backgroundColor: Colors.primarySoft,
+    backgroundColor: colors.primarySoft,
   },
   sideLabel: {
     fontSize: 15,
@@ -258,7 +270,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.four,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: colors.border,
     gap: Spacing.half,
   },
-});
+}));

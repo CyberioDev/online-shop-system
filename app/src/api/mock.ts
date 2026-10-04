@@ -4,7 +4,7 @@
  * something realistic to show. Changes are lost on reload.
  */
 import { createReviewMock } from './mock-review';
-import { fail, newId, respond } from './mock-utils';
+import { fail, newId, ORDER_DEFAULTS, respond } from './mock-utils';
 import {
   ApiError,
   type ApiClient,
@@ -21,9 +21,10 @@ import {
   type ProductInput,
   type ReportSummary,
   type Session,
+  type ShopSettings,
 } from './types';
 
-import { TEST_ACCOUNT } from '@/constants/config';
+import { DEMO_RESET_CODE, TEST_ACCOUNT } from '@/constants/config';
 import { addDays, fromDayKey, startOfDay, toDayKey } from '@/lib/format';
 
 /** Small seeded PRNG so the demo data is stable between reloads. */
@@ -192,6 +193,7 @@ function generateHistory() {
         createdAt: createdAt.toISOString(),
         paidAt: paidAt?.toISOString() ?? null,
         matchedBy: status === 'paid' ? (rand() < 0.06 ? 'manual' : 'auto') : null,
+        ...ORDER_DEFAULTS,
       });
     }
 
@@ -206,7 +208,48 @@ function generateHistory() {
 
 const { orders, unmatchedPayments } = generateHistory();
 const review = createReviewMock(orders, products, now);
+const DISTRICTS = ['БЗД', 'СБД', 'ХУД', 'СХД', 'ЧД', 'БГД'];
+
 seedPreorderOrders();
+decorateOrders();
+
+/**
+ * Fills the seller-side fields of the seeded orders: chat links, phones and addresses
+ * the chatbot would have collected, deliveries done, and a few cancellations. Uses its
+ * own random sequence so the rest of the demo data stays the same.
+ */
+function decorateOrders() {
+  const rand = mulberry32(4242);
+  const day = 24 * 3_600_000;
+  for (const o of orders) {
+    o.chatUrl =
+      o.channel === 'instagram'
+        ? 'https://www.instagram.com/direct/inbox/'
+        : o.channel === 'live'
+          ? null
+          : 'https://business.facebook.com/latest/inbox/all';
+    if (o.status !== 'paid') continue;
+    if (rand() < 0.85) o.customerPhone = `8800${String(Math.floor(rand() * 10_000)).padStart(4, '0')}`;
+    if (rand() < 0.8) {
+      const district = DISTRICTS[Math.floor(rand() * DISTRICTS.length)];
+      o.deliveryAddress = `${district}, ${1 + Math.floor(rand() * 30)}-р хороо, ${1 + Math.floor(rand() * 90)}-р байр, ${1 + Math.floor(rand() * 120)} тоот`;
+    }
+    // Paid more than 2 days ago: delivered by now. Some of the last two days too.
+    const paidAge = now.getTime() - new Date(o.paidAt!).getTime();
+    if (paidAge > 2 * day || (paidAge > day / 2 && rand() < 0.3)) {
+      o.fulfilledAt = new Date(new Date(o.paidAt!).getTime() + Math.min(paidAge, day) * rand()).toISOString();
+    }
+  }
+  // A few cancellations among older orders.
+  const older = orders.filter((o) => o.status === 'paid' && now.getTime() - new Date(o.createdAt).getTime() > 3 * day);
+  for (let i = 0; i < 4 && older.length; i++) {
+    const o = older[Math.floor(rand() * older.length)];
+    o.status = 'cancelled';
+    o.fulfilledAt = null;
+    o.cancelledAt = new Date(new Date(o.createdAt).getTime() + day).toISOString();
+    o.cancelReason = i % 2 ? 'Худалдан авагч цуцалсан' : 'Хэмжээ дууссан';
+  }
+}
 
 /** Orders for the seeded preorders, placed between each one's start and closing day. */
 function seedPreorderOrders() {
@@ -237,11 +280,19 @@ function seedPreorderOrders() {
         createdAt: createdAt.toISOString(),
         paidAt: paid ? new Date(Math.min(createdAt.getTime() + 20 * 60_000, now.getTime())).toISOString() : null,
         matchedBy: paid ? 'auto' : null,
+        ...ORDER_DEFAULTS,
       });
     }
   }
   orders.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
+
+/** Demo password; starts as the test account's and changes with changePassword/reset. */
+let mockPassword: string = TEST_ACCOUNT.password;
+
+let shopSettings: ShopSettings = {
+  bankAccount: { bank: 'Хаан банк', accountNumber: '1234567890', accountHolder: 'Б. Болор' },
+};
 
 let integrations: Integrations = {
   facebook: {
@@ -270,7 +321,7 @@ const inRange = (iso: string, range: DateRange) => {
 const lastEventAt = (order: Order) => order.paidAt ?? order.createdAt;
 
 const unitsOf = (productId: string, list: Order[], variantName?: string | null) =>
-  list.reduce(
+  list.filter((o) => o.status !== 'cancelled').reduce(
     (sum, o) =>
       sum +
       o.items
@@ -381,7 +432,7 @@ export const mockApi: ApiClient = {
   setUnauthorizedHandler() {},
 
   login(phone, password) {
-    if (phone !== TEST_ACCOUNT.phone || password !== TEST_ACCOUNT.password) {
+    if (phone !== TEST_ACCOUNT.phone || password !== mockPassword) {
       return fail('invalid_credentials');
     }
     const session: Session = {
@@ -448,7 +499,7 @@ export const mockApi: ApiClient = {
     const product = products.find((p) => p.id === id);
     if (!product?.preorder) return fail('not_found');
     const related = orders
-      .filter((o) => o.items.some((i) => i.productId === id))
+      .filter((o) => o.status !== 'cancelled' && o.items.some((i) => i.productId === id))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     const paid = related.filter((o) => o.status === 'paid');
     const names: (string | null)[] = product.variants.length ? product.variants.map((v) => v.name) : [null];
@@ -529,6 +580,137 @@ export const mockApi: ApiClient = {
   contactBuyer: review.contactBuyer,
   markRefunded: review.markRefunded,
   reopenCase: review.reopenCase,
+
+  changePassword(currentPassword, newPassword) {
+    if (currentPassword !== mockPassword) return fail('validation', 'Одоогийн нууц үг буруу байна');
+    if (newPassword.length < 8) return fail('validation', 'Шинэ нууц үг 8-аас дээш тэмдэгттэй байна');
+    mockPassword = newPassword;
+    return respond(undefined);
+  },
+
+  requestPasswordReset(phone) {
+    // Same answer for any number, so the endpoint doesn't reveal which accounts exist.
+    return respond({ sentTo: `+976 ${phone.slice(0, 2)}** **${phone.slice(-2)}` });
+  },
+
+  confirmPasswordReset(phone, code, newPassword) {
+    if (phone !== TEST_ACCOUNT.phone || code !== DEMO_RESET_CODE) {
+      return fail('validation', 'Код буруу эсвэл хугацаа нь дууссан байна');
+    }
+    if (newPassword.length < 8) return fail('validation', 'Шинэ нууц үг 8-аас дээш тэмдэгттэй байна');
+    mockPassword = newPassword;
+    return respond(undefined);
+  },
+
+  getShopSettings() {
+    return respond(shopSettings);
+  },
+
+  updateBankAccount(account) {
+    const accountNumber = account.accountNumber.replace(/\s/g, '').toUpperCase();
+    if (!account.bank.trim() || !account.accountHolder.trim()) return fail('validation');
+    if (!/^(MN\d{18}|\d{8,20})$/.test(accountNumber)) {
+      return fail('validation', 'Дансны дугаар буруу байна');
+    }
+    shopSettings = {
+      bankAccount: { bank: account.bank.trim(), accountNumber, accountHolder: account.accountHolder.trim() },
+    };
+    return respond(shopSettings);
+  },
+
+  searchOrders({ view, q, cursor, limit = 50 }) {
+    const needle = q?.trim().toLowerCase() ?? '';
+    const matches = orders
+      .filter((o) =>
+        view === 'cancelled'
+          ? o.status === 'cancelled'
+          : o.status === 'paid' && (view === 'fulfilled') === (o.fulfilledAt !== null),
+      )
+      .filter(
+        (o) =>
+          !needle ||
+          o.code.includes(needle) ||
+          o.customerName.toLowerCase().includes(needle) ||
+          (o.customerPhone ?? '').includes(needle) ||
+          o.items.some((i) => i.productName.toLowerCase().includes(needle)),
+      )
+      .sort((a, b) =>
+        view === 'to_fulfill'
+          ? (a.paidAt ?? '').localeCompare(b.paidAt ?? '')
+          : view === 'fulfilled'
+            ? (b.fulfilledAt ?? '').localeCompare(a.fulfilledAt ?? '')
+            : (b.cancelledAt ?? '').localeCompare(a.cancelledAt ?? ''),
+      );
+    const offset = cursor ? Number(cursor) : 0;
+    const page = matches.slice(offset, offset + limit);
+    return respond({
+      orders: page,
+      total: matches.length,
+      nextCursor: offset + limit < matches.length ? String(offset + limit) : null,
+    });
+  },
+
+  getOrder(id) {
+    const order = orders.find((o) => o.id === id);
+    return order ? respond(order) : fail('not_found');
+  },
+
+  updateOrder(id, update) {
+    const order = orders.find((o) => o.id === id);
+    if (!order) return fail('not_found');
+    if (update.customerPhone != null && !/^\d{8}$/.test(update.customerPhone)) {
+      return fail('validation', 'Утасны дугаар 8 оронтой байна');
+    }
+    if (update.itemVariants) {
+      if (update.itemVariants.length !== order.items.length) return fail('validation');
+      for (const [i, variant] of update.itemVariants.entries()) {
+        const product = products.find((p) => p.id === order.items[i].productId);
+        if (product?.variants.length && !product.variants.some((v) => v.name === variant)) {
+          return fail('validation', 'Ийм хэмжээ, төрөл алга');
+        }
+      }
+      order.items = order.items.map((item, i) => ({ ...item, variantName: update.itemVariants![i] }));
+    }
+    if (update.customerPhone !== undefined) order.customerPhone = update.customerPhone;
+    if (update.deliveryAddress !== undefined) order.deliveryAddress = update.deliveryAddress?.trim() || null;
+    if (update.sellerNote !== undefined) order.sellerNote = update.sellerNote?.trim() || null;
+    return respond(order);
+  },
+
+  setOrdersFulfilled(orderIds, fulfilled) {
+    const selected = orders.filter((o) => orderIds.includes(o.id));
+    if (selected.length !== orderIds.length) return fail('not_found');
+    if (selected.some((o) => o.status !== 'paid')) {
+      return fail('conflict', 'Зөвхөн төлөгдсөн захиалгыг хүргэсэн болгоно');
+    }
+    const at = new Date().toISOString();
+    for (const o of selected) o.fulfilledAt = fulfilled ? (o.fulfilledAt ?? at) : null;
+    return respond(selected);
+  },
+
+  cancelOrder(id, reason) {
+    const order = orders.find((o) => o.id === id);
+    if (!order) return fail('not_found');
+    if (order.status === 'cancelled') return fail('conflict', 'Аль хэдийн цуцалсан байна');
+    if (order.status === 'needs_review') {
+      return fail('conflict', 'Энэ захиалгын төлбөрийг эхлээд “Шалгах” хэсэгт шийдвэрлэнэ үү');
+    }
+    order.status = 'cancelled';
+    order.fulfilledAt = null;
+    order.cancelledAt = new Date().toISOString();
+    order.cancelReason = reason?.trim() || null;
+    return respond(order);
+  },
+
+  restoreOrder(id) {
+    const order = orders.find((o) => o.id === id);
+    if (!order) return fail('not_found');
+    if (order.status !== 'cancelled') return fail('conflict', 'Цуцлагдаагүй захиалга байна');
+    order.status = order.paidAt ? 'paid' : 'awaiting_payment';
+    order.cancelledAt = null;
+    order.cancelReason = null;
+    return respond(order);
+  },
 
   getIntegrations() {
     return respond(integrations);
