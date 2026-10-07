@@ -10,6 +10,9 @@ services:
       EXPO_NO_TELEMETRY: "1"
       # Open the site from the host; containers cannot launch a desktop browser.
       BROWSER: "none"
+      # Backend URL as seen from the browser (not from inside Docker). Empty = demo data.
+      # Example: EXPO_PUBLIC_API_URL=http://localhost:8080 docker compose up frontend
+      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-}
     stdin_open: true
     tty: true
 
