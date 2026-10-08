@@ -336,3 +336,9 @@ func (r CaseResolution) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(CaseResolutionNoOrder{Kind: r.Kind, Category: r.Category, ResolvedAt: r.ResolvedAt})
 }
+
+type TransactionPage struct {
+	Transactions []BankPayment `json:"transactions"`
+	Total        int64         `json:"total"`
+	NextCursor   NextCursor    `json:"nextCursor"`
+}

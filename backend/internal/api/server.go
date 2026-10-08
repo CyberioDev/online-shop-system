@@ -47,6 +47,9 @@ func New(s *shop.Service, origins []string) *Server {
 			c.SetRequest(c.Request().WithContext(ctx))
 			start := time.Now()
 			err := next(c)
+			if err != nil {
+				slog.Warn("request handler failed", "method", c.Request().Method, "route", c.Path(), "error", err)
+			}
 			slog.Info("http request", "method", c.Request().Method, "path", c.Path(), "duration", time.Since(start), "failed", err != nil)
 			return err
 		}
@@ -88,6 +91,9 @@ func (a *Server) fail(c *echo.Context, err error) {
 			code = "internal"
 		}
 	}
+	if status == 404 {
+		slog.Warn("request not found", "method", c.Request().Method, "route", c.Path(), "error", err)
+	}
 	if status >= 500 {
 		slog.Error("request failed", "method", c.Request().Method, "path", c.Request().URL.Path, "error", err)
 	}
@@ -118,7 +124,8 @@ func (a *Server) auth(role string) echo.MiddlewareFunc {
 					return err
 				}
 				if !belongs {
-					return shop.NotFound()
+					slog.Warn("bank listener credential mismatch", "requested_listener", listener)
+					return &shop.Error{Status: 404, Code: "not_found", Message: "Webhook хаяг болон токен өөр холболтынх байна. Нэг холболтоос авсан хаяг, токеныг хамт ашиглана уу."}
 				}
 			}
 			c.Set("identity", i)
@@ -286,6 +293,13 @@ func (a *Server) routes() {
 		}
 		return err
 	})
+	owner.GET("/transactions", func(c *echo.Context) error {
+		q, err := shop.ParseQuery(c.QueryParams(), false)
+		if err != nil {
+			return err
+		}
+		return a.tx(c, false, func(ctx context.Context, t *store.Tx) (any, error) { return s.Transactions(ctx, t, q) })
+	})
 	owner.GET("/orders", func(c *echo.Context) error { return a.orders(c, false) })
 	owner.GET("/orders/search", func(c *echo.Context) error { return a.orders(c, true) })
 	owner.GET("/orders/:id", a.order)
@@ -328,7 +342,7 @@ func (a *Server) routes() {
 		return a.tx(c, false, func(ctx context.Context, t *store.Tx) (any, error) { return s.ReviewSummary(ctx, t) })
 	})
 	owner.GET("/review/cases", func(c *echo.Context) error {
-		q, err := shop.ParseQuery(c.QueryParams(), true)
+		q, err := shop.ParseQuery(c.QueryParams(), false)
 		if err != nil {
 			return err
 		}
@@ -385,6 +399,7 @@ func (a *Server) routes() {
 	owner.POST("/uploads/images", a.upload)
 	e.GET("/media/:id", a.media)
 	owner.GET("/integrations", a.integrations)
+	owner.POST("/integrations/sms/rotate", a.rotateSMS)
 	owner.PUT("/integrations/chatbot", a.configureWebhook)
 	owner.DELETE("/integrations/chatbot", a.deleteWebhook)
 	// Legacy direct-Meta routes remain explicit unsupported capabilities. Make /
@@ -409,6 +424,7 @@ func (a *Server) routes() {
 	bank.POST("/transactions", a.payment)
 	// Compatibility URL for phone listeners; accepts normalized JSON transactions.
 	e.POST("/hooks/sms/:listenerId", a.payment, a.auth("bank"))
+	e.POST("/hooks/sms/:listenerId/raw", a.rawSMS, a.auth("bank"))
 }
 func (a *Server) products(c *echo.Context) error {
 	q, err := shop.ParseQuery(c.QueryParams(), false)
@@ -441,7 +457,7 @@ func (a *Server) saveProduct(c *echo.Context) error {
 	return err
 }
 func (a *Server) orders(c *echo.Context, search bool) error {
-	q, err := shop.ParseQuery(c.QueryParams(), true)
+	q, err := shop.ParseQuery(c.QueryParams(), false)
 	if err != nil {
 		return err
 	}

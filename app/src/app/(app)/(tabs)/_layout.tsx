@@ -43,6 +43,9 @@ export default function TabsLayout() {
             Захиалга
           </NavButton>
         </TabTrigger>
+        <TabTrigger name="transactions" href="/transactions" asChild>
+          <NavButton icon="credit-card" isWide={isWide}>Гүйлгээ</NavButton>
+        </TabTrigger>
         <TabTrigger name="products" href="/products" asChild>
           <NavButton icon="box" isWide={isWide}>
             Бараа

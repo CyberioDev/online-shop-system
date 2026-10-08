@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { api, type Product, type SaleType } from '@/api';
+import { api, type Product, type SaleType, type ListQuery } from '@/api';
 import { PreorderStatusPill } from '@/components/preorder-status-pill';
 import { ProductThumb } from '@/components/product-thumb';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,9 @@ import { TextField } from '@/components/ui/text-field';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { makeStyles, useColors } from '@/theme';
 import { useIsWide } from '@/hooks/use-is-wide';
-import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
+import { useReloadOnFocus } from '@/hooks/use-resource';
+import { usePagedResource } from '@/hooks/use-paged-resource';
+import { DateTimeFilter, Pagination } from '@/components/list-controls';
 import { errorMessage } from '@/lib/errors';
 import { formatMoney, formatNumber, formatShortDate, fromDayKey } from '@/lib/format';
 import { describeStock, totalStock } from '@/lib/labels';
@@ -27,16 +29,14 @@ export default function ProductsScreen() {
   const isWide = useIsWide();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<SaleType | 'all'>('all');
-  const { data: products, error, reload, setData } = useResource(() => api.listProducts(), []);
+  const [range, setRange] = useState<ListQuery>({});
+  const listQuery = { ...range, q: query.trim() || undefined, saleType: filter === 'all' ? undefined : filter, limit: 25 };
+  const paging = usePagedResource(cursor => api.getProductsPage({ ...listQuery, cursor }), JSON.stringify(listQuery));
+  const { data, error, reload } = paging;
+  const products = data?.products;
   useReloadOnFocus(reload);
-
-  const needle = query.trim().toLowerCase();
-  const visible = (products ?? []).filter(
-    (p) =>
-      (filter === 'all' || p.saleType === filter) &&
-      (!needle || p.name.toLowerCase().includes(needle) || p.code.toLowerCase().includes(needle)),
-  );
-  const preorderCount = (products ?? []).filter((p) => p.saleType === 'preorder').length;
+  const visible = products ?? [];
+  const needle = query.trim();
   const columns = isWide ? 2 : 1;
   const rows: Product[][] = [];
   for (let i = 0; i < visible.length; i += columns) rows.push(visible.slice(i, i + columns));
@@ -55,44 +55,21 @@ export default function ProductsScreen() {
         />
       </View>
 
+      <DateTimeFilter onRefresh={reload} onChange={setRange} />
+      <TextField placeholder="Бараа эсвэл код хайх" value={query} onChangeText={setQuery} autoCorrect={false} />
       {!products ? (
         <LoadState error={error} onRetry={reload} />
       ) : (
         <View style={styles.body}>
           <Text variant="caption" color={colors.textSecondary}>
-            {products.length} бараа · Үнийг харандаа дээр дарж шууд засна
+            {data?.total} бараа · Үнийг харандаа дээр дарж шууд засна
           </Text>
 
-          {preorderCount > 0 && (
-            <View style={styles.filters}>
-              <Chip label="Бүгд" selected={filter === 'all'} onPress={() => setFilter('all')} />
-              <Chip
-                label="Бэлэн бараа"
-                selected={filter === 'stock'}
-                onPress={() => setFilter('stock')}
-              />
-              <Chip
-                label={`Урьдчилсан захиалга (${preorderCount})`}
-                selected={filter === 'preorder'}
-                onPress={() => setFilter('preorder')}
-              />
-            </View>
-          )}
-
-          {products.length > 0 && (
-            <TextField
-              placeholder="Бараа эсвэл код хайх"
-              value={query}
-              onChangeText={setQuery}
-              autoCorrect={false}
-              prefix={
-                <View style={styles.searchIcon}>
-                  <Icon name="search" size={18} color={colors.textMuted} />
-                </View>
-              }
-            />
-          )}
-
+          <View style={styles.filters}>
+            <Chip label="Бүгд" selected={filter === 'all'} onPress={() => setFilter('all')} />
+            <Chip label="Бэлэн бараа" selected={filter === 'stock'} onPress={() => setFilter('stock')} />
+            <Chip label="Урьдчилсан захиалга" selected={filter === 'preorder'} onPress={() => setFilter('preorder')} />
+          </View>
           {products.length === 0 ? (
             <Card style={styles.empty}>
               <Icon name="box" size={28} color={colors.textSecondary} />
@@ -112,8 +89,8 @@ export default function ProductsScreen() {
                   <ProductCard
                     key={product.id}
                     product={product}
-                    onUpdated={(updated) =>
-                      setData(products.map((p) => (p.id === updated.id ? updated : p)))
+                    onUpdated={() =>
+                      reload()
                     }
                   />
                 ))}
@@ -122,6 +99,7 @@ export default function ProductsScreen() {
             ))
           )}
 
+          <Pagination {...paging} total={data?.total ?? 0} count={products.length} hasNext={!!data?.nextCursor} />
           <Card tone="info" style={styles.tip}>
             <Text variant="caption" color={colors.primary} style={styles.tipText}>
               Шинэ бараа нэмэхэд нэр, үнэ л хангалттай. Зураг заавал шаардлагагүй, барааны кодыг систем автоматаар өгч

@@ -1,0 +1,17 @@
+# Run both UIs: docker compose -f compose.yaml -f compose.studio.yaml up --build -d
+services:
+  backend:
+    environment:
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081,http://localhost:8082}
+  frontend-v2:
+    build: ./app-v2
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./app-v2:/app
+      - /app/node_modules
+    environment:
+      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:8080}
+      EXPO_NO_TELEMETRY: "1"
+      BROWSER: "none"
+    command: ["npm", "run", "web", "--", "--host", "lan"]
