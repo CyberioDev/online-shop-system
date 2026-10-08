@@ -1,5 +1,11 @@
 # Backend integration guide
 
+> Historical frontend/mock guide (v0.1). The implemented backend and v0.2 API use
+> date-time ranges, paginated lists, normalized bank transaction POSTs, and
+> Make/Zapier webhook integration. See [backend/README.md](../backend/README.md)
+> and [the current OpenAPI contract](api/openapi.yaml). The frontend adapter has
+> not yet migrated to that contract; older examples below are not the server spec.
+
 For whoever builds the Go + PostgreSQL backend that the Tulgagch app talks to. The
 frontend is finished against an in-memory mock; this document and the OpenAPI spec
 describe exactly what it expects from a real server.
