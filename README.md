@@ -47,17 +47,22 @@ and phone connectivity require their own Expo setup.
 
 ## Frontend demo mode
 
-The frontend and backend are not connected yet; the backend currently only exposes
-a health endpoint. Until then the app runs on in-memory demo data
+The backend now implements the owner, chatbot and bank APIs with PostgreSQL. The
+frontend still runs on in-memory demo data by default
 (`app/src/api/mock.ts`): sign in with the temporary test account `99996666` /
 `admintest` (shown on the login page; defined as `TEST_ACCOUNT` in
 `app/src/constants/config.ts`). Changes are lost on reload.
 
 ## Connecting the backend
 
-Building the backend? Start with **[docs/backend-integration.md](docs/backend-integration.md)**
-(conventions, business rules, integration flows) and the API contract
-**[docs/api/openapi.yaml](docs/api/openapi.yaml)**.
+See **[backend/README.md](backend/README.md)** for the Docker test workflow, tenant
+provisioning, Make/Zapier integration and bank transaction payloads. The current
+contract is **[docs/api/openapi.yaml](docs/api/openapi.yaml)**.
+
+The frontend client still needs the v0.2 migration (date-time ranges and paginated
+responses) before all screens can use the real backend. The older
+[frontend integration guide](docs/backend-integration.md) documents its original
+mock behavior.
 
 To point the app at a running backend, set `EXPO_PUBLIC_API_URL`:
 

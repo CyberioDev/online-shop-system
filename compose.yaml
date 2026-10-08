@@ -26,6 +26,21 @@ services:
     environment:
       PORT: "8080"
       DATABASE_URL: "postgres://online_shop:online_shop@db:5432/online_shop?sslmode=disable"
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
+      # Local development defaults only; supply unique secrets for deployment.
+      CURSOR_SECRET: ${CURSOR_SECRET:-local-development-cursor-secret-change-before-deploy}
+      BOOTSTRAP_SHOP_ID: ${BOOTSTRAP_SHOP_ID:-demo-shop}
+      BOOTSTRAP_SHOP_NAME: ${BOOTSTRAP_SHOP_NAME:-Demo shop}
+      BOOTSTRAP_OWNER_NAME: ${BOOTSTRAP_OWNER_NAME:-Demo owner}
+      BOOTSTRAP_PHONE: ${BOOTSTRAP_PHONE:-99996666}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-admintest}
+      BOOTSTRAP_CHATBOT_KEY: ${BOOTSTRAP_CHATBOT_KEY:-local-development-chatbot-key-change-before-deploy}
+      BOOTSTRAP_BANK_KEY: ${BOOTSTRAP_BANK_KEY:-local-development-bank-key-change-before-deploy}
+      BOOTSTRAP_WEBHOOK_URL: ${BOOTSTRAP_WEBHOOK_URL:-}
+      BOOTSTRAP_WEBHOOK_SECRET: ${BOOTSTRAP_WEBHOOK_SECRET:-}
+      BOOTSTRAP_SMS_URL: ${BOOTSTRAP_SMS_URL:-}
+      BOOTSTRAP_SMS_SECRET: ${BOOTSTRAP_SMS_SECRET:-}
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
       interval: 10s
