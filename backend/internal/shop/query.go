@@ -16,14 +16,14 @@ import (
 )
 
 type Query struct {
-	From, To        Timestamp
-	Limit           int
-	Cursor, View, Q string
+	From, To                  Timestamp
+	Limit                     int
+	Cursor, View, Q, SaleType string
 }
 
 func ParseQuery(v url.Values, requireRange bool) (Query, error) {
-	q := Query{Limit: 50, Cursor: v.Get("cursor"), View: v.Get("view"), Q: v.Get("q")}
-	for _, key := range []string{"from", "to", "limit", "cursor", "view", "q"} {
+	q := Query{Limit: 50, Cursor: v.Get("cursor"), View: v.Get("view"), Q: v.Get("q"), SaleType: v.Get("saleType")}
+	for _, key := range []string{"from", "to", "limit", "cursor", "view", "q", "saleType"} {
 		if len(v[key]) > 1 {
 			return q, Invalid()
 		}
@@ -41,17 +41,24 @@ func ParseQuery(v url.Values, requireRange bool) (Query, error) {
 	if len(q.Cursor) > 4096 || len(q.Q) > 200 {
 		return q, Invalid()
 	}
-	if requireRange || v.Has("from") || v.Has("to") {
-		from, e := time.Parse(time.RFC3339Nano, v.Get("from"))
-		if e != nil {
-			return q, Invalid()
+	if q.SaleType != "" && q.SaleType != "stock" && q.SaleType != "preorder" {
+		return q, Invalid()
+	}
+	for _, bound := range []string{"from", "to"} {
+		if requireRange || v.Has(bound) {
+			at, err := time.Parse(time.RFC3339Nano, v.Get(bound))
+			if err != nil {
+				return q, Invalid()
+			}
+			if bound == "from" {
+				q.From = Stamp(at)
+			} else {
+				q.To = Stamp(at)
+			}
 		}
-		to, e := time.Parse(time.RFC3339Nano, v.Get("to"))
-		if e != nil || !from.Before(to) {
-			return q, Invalid()
-		}
-		q.From = Stamp(from)
-		q.To = Stamp(to)
+	}
+	if q.From != "" && q.To != "" && q.From >= q.To {
+		return q, Invalid()
 	}
 	return q, nil
 }
@@ -144,25 +151,55 @@ func page[T any](ctx context.Context, s *Service, t *store.Tx, table, endpoint, 
 	}
 	return result, total, next, nil
 }
+
+// dateWhere uses normalized UTC timestamps; from is inclusive and to exclusive.
+func dateWhere(key string, q Query, where string, args []any) (string, []any) {
+	if q.From != "" {
+		args = append(args, q.From)
+		where += fmt.Sprintf(" AND %s >= $%d", key, len(args)+1)
+	}
+	if q.To != "" {
+		args = append(args, q.To)
+		where += fmt.Sprintf(" AND %s < $%d", key, len(args)+1)
+	}
+	return where, args
+}
 func (s *Service) Products(ctx context.Context, t *store.Tx, q Query) (ProductPage, error) {
-	where := ""
-	args := []any{}
+	where, args := dateWhere("body->>'createdAt'", q, "", []any{})
 	if q.Q != "" {
-		where = " AND (strpos(lower(body->>'name'),lower($2))>0 OR lower(body->>'code')=lower($2))"
 		args = append(args, q.Q)
+		where += fmt.Sprintf(" AND (strpos(lower(body->>'name'),lower($%d))>0 OR strpos(lower(body->>'code'),lower($%d))>0)", len(args)+1, len(args)+1)
+	}
+	if q.SaleType != "" {
+		args = append(args, q.SaleType)
+		where += fmt.Sprintf(" AND body->>'saleType'=$%d", len(args)+1)
 	}
 	items, total, next, e := page[Product](ctx, s, t, "products", "products", "body->>'code'", where, false, q, args)
 	return ProductPage{items, total, next}, e
 }
+func (s *Service) Transactions(ctx context.Context, t *store.Tx, q Query) (TransactionPage, error) {
+	where, args := dateWhere("body->>'receivedAt'", q, "", []any{})
+	if q.Q != "" {
+		args = append(args, q.Q)
+		where += fmt.Sprintf(" AND (strpos(lower(body->>'note'),lower($%d))>0 OR strpos(lower(body->>'senderName'),lower($%d))>0)", len(args)+1, len(args)+1)
+	}
+	items, total, next, err := page[BankPayment](ctx, s, t, "payments", "transactions", "body->>'receivedAt'", where, true, q, args)
+	return TransactionPage{items, total, next}, err
+}
 func (s *Service) Orders(ctx context.Context, t *store.Tx, q Query, search bool) (OrderPage, error) {
-	where := " AND body->>'createdAt'>=$2 AND body->>'createdAt'<$3"
-	args := []any{q.From, q.To}
+	where, args := dateWhere("body->>'createdAt'", q, "", []any{})
 	key := "body->>'createdAt'"
 	desc := false
 	endpoint := "orders"
 	if search {
 		endpoint = "orders/search"
 		switch q.View {
+		case "all":
+			desc = true
+		case "awaiting_payment", "needs_review":
+			args = append(args, q.View)
+			where += fmt.Sprintf(" AND body->>'status'=$%d", len(args)+1)
+			desc = true
 		case "to_fulfill":
 			where += " AND body->>'status'='paid' AND body->>'fulfilledAt' IS NULL"
 			key = "body->>'paidAt'"
@@ -180,13 +217,15 @@ func (s *Service) Orders(ctx context.Context, t *store.Tx, q Query, search bool)
 	}
 	if q.Q != "" {
 		args = append(args, q.Q)
-		where += " AND (strpos(lower(body->>'customerName'),lower($4))>0 OR strpos(body->>'code',$4)>0 OR strpos(body->>'customerPhone',$4)>0 OR EXISTS(SELECT 1 FROM jsonb_array_elements(body->'items') i WHERE strpos(lower(i->>'productName'),lower($4))>0))"
+		n := len(args) + 1
+		where += fmt.Sprintf(" AND (strpos(lower(body->>'customerName'),lower($%d))>0 OR strpos(body->>'code',$%d)>0 OR strpos(body->>'customerPhone',$%d)>0 OR EXISTS(SELECT 1 FROM jsonb_array_elements(body->'items') i WHERE strpos(lower(i->>'productName'),lower($%d))>0))", n, n, n, n)
 	}
 	items, total, next, e := page[Order](ctx, s, t, "orders", endpoint, key, where, desc, q, args)
 	return OrderPage{items, total, next}, e
 }
 func (s *Service) Cases(ctx context.Context, t *store.Tx, q Query) (ReviewCasePage, error) {
-	items, total, next, e := page[ReviewCase](ctx, s, t, "review_cases", "review/cases", "body->'payment'->>'receivedAt'", " AND body->'payment'->>'receivedAt'>=$2 AND body->'payment'->>'receivedAt'<$3", true, q, []any{q.From, q.To})
+	where, args := dateWhere("body->'payment'->>'receivedAt'", q, "", []any{})
+	items, total, next, e := page[ReviewCase](ctx, s, t, "review_cases", "review/cases", "body->'payment'->>'receivedAt'", where, true, q, args)
 	return ReviewCasePage{items, total, next}, e
 }
 func (s *Service) Preorder(ctx context.Context, t *store.Tx, id string, q Query) (PreorderDetail, error) {
@@ -198,7 +237,8 @@ func (s *Service) Preorder(ctx context.Context, t *store.Tx, id string, q Query)
 		return PreorderDetail{}, NotFound()
 	}
 	where := " AND EXISTS(SELECT 1 FROM jsonb_array_elements(body->'items') i WHERE i->>'productId'=$2)"
-	orders, total, next, e := page[Order](ctx, s, t, "orders", "preorder/"+id, "body->>'createdAt'", where, true, q, []any{id})
+	where, args := dateWhere("body->>'createdAt'", q, where, []any{id})
+	orders, total, next, e := page[Order](ctx, s, t, "orders", "preorder/"+id, "body->>'createdAt'", where, true, q, args)
 	if e != nil {
 		return PreorderDetail{}, e
 	}

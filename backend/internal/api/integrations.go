@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v5"
 	"online-shop/backend/internal/delivery"
@@ -15,25 +16,34 @@ import (
 func (a *Server) integrations(c *echo.Context) error {
 	return a.tx(c, false, func(ctx context.Context, t *store.Tx) (any, error) {
 		var listener *string
-		err := t.QueryRow(ctx, "SELECT min(listener_id) FROM service_keys WHERE shop_id=$1 AND role='bank'", t.ShopID).Scan(&listener)
+		err := t.QueryRow(ctx, "SELECT min(listener_id) FROM service_keys WHERE shop_id=$1 AND role='bank' AND listener_id LIKE 'sms-%'", t.ShopID).Scan(&listener)
 		if err != nil {
 			return nil, err
 		}
 		var received *shop.Timestamp
-		err = t.QueryRow(ctx, "SELECT max(body->>'receivedAt') FROM payments WHERE shop_id=$1", t.ShopID).Scan(&received)
+		var receivedTime *time.Time
+		err = t.QueryRow(ctx, "SELECT max(received_at) FROM bank_sms_receipts WHERE shop_id=$1", t.ShopID).Scan(&receivedTime)
+		if receivedTime != nil {
+			value := shop.Stamp(*receivedTime)
+			received = &value
+		}
 		if err != nil {
 			return nil, err
 		}
 		url := ""
 		if listener != nil {
-			url = a.Service.PublicURL + "/hooks/sms/" + *listener
+			url = a.Service.PublicURL + "/hooks/sms/" + *listener + "/raw"
 		}
 		connected, err := a.Service.HasTarget(ctx, t, "chatbot")
 		if err != nil {
 			return nil, err
 		}
 		v := shop.Integrations{SMS: shop.SmsListener{Connected: listener != nil, WebhookURL: url, Token: "", LastReceivedAt: received}}
-		return map[string]any{"facebook": v.Facebook, "instagram": v.Instagram, "sms": v.SMS, "chatbot": map[string]bool{"connected": connected}}, nil
+		failures, err := a.smsReceipts(ctx, t)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"facebook": v.Facebook, "instagram": v.Instagram, "sms": map[string]any{"connected": listener != nil, "webhookUrl": url, "token": "", "senderNumber": "131917", "deviceLabel": "iPhone", "lastReceivedAt": received, "failures": failures}, "chatbot": map[string]bool{"connected": connected}}, nil
 	})
 }
 func (a *Server) configureWebhook(c *echo.Context) error {

@@ -135,7 +135,7 @@ func TestTenantIsolationAndPages(t *testing.T) {
 	f.call(422, "GET", "/products?limit=1&cursor="+cursor, f.ownerB, nil)
 	f.call(422, "GET", "/products?limit=2&cursor="+cursor, f.ownerA, nil)
 	f.call(422, "GET", "/products?limit=201", f.ownerA, nil)
-	f.call(422, "GET", "/orders", f.ownerA, nil)
+	f.call(200, "GET", "/orders", f.ownerA, nil)
 	f.call(422, "GET", "/orders?from=2026-01-01&to=2026-01-02", f.ownerA, nil)
 	f.bank(f.ownerA)
 	f.bank(f.ownerB)
