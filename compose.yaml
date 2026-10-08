@@ -10,9 +10,8 @@ services:
       EXPO_NO_TELEMETRY: "1"
       # Open the site from the host; containers cannot launch a desktop browser.
       BROWSER: "none"
-      # Backend URL as seen from the browser (not from inside Docker). Empty = demo data.
-      # Example: EXPO_PUBLIC_API_URL=http://localhost:8080 docker compose up frontend
-      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-}
+      # Browser-visible backend URL. The browser uses localhost because port 8080 is published.
+      EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:-http://localhost:8080}
     stdin_open: true
     tty: true
 
@@ -37,6 +36,8 @@ services:
       BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-admintest}
       BOOTSTRAP_CHATBOT_KEY: ${BOOTSTRAP_CHATBOT_KEY:-local-development-chatbot-key-change-before-deploy}
       BOOTSTRAP_BANK_KEY: ${BOOTSTRAP_BANK_KEY:-local-development-bank-key-change-before-deploy}
+      # Only seeds fixtures for the local demo-shop tenant.
+      BOOTSTRAP_DEMO_DATA: ${BOOTSTRAP_DEMO_DATA:-true}
       BOOTSTRAP_WEBHOOK_URL: ${BOOTSTRAP_WEBHOOK_URL:-}
       BOOTSTRAP_WEBHOOK_SECRET: ${BOOTSTRAP_WEBHOOK_SECRET:-}
       BOOTSTRAP_SMS_URL: ${BOOTSTRAP_SMS_URL:-}

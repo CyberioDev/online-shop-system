@@ -235,12 +235,31 @@ func (a *Server) routes() {
 		if err := decode(c, &in); err != nil {
 			return err
 		}
-		return a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) { return s.Price(ctx, t, c.Param("id"), in.Price) })
+		var updated shop.Product
+		err := a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) {
+			var err error
+			updated, err = s.Price(ctx, t, c.Param("id"), in.Price)
+			return updated, err
+		})
+		if err == nil {
+			slog.Info("product.price_updated", "shop_id", identity(c).ShopID, "product_id", updated.ID, "product_code", updated.Code, "price", updated.Price)
+		}
+		return err
 	})
 	owner.DELETE("/products/:id", func(c *echo.Context) error {
-		return a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) {
+		var deleted shop.Product
+		err := a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) {
+			var err error
+			deleted, err = s.Product(ctx, t, c.Param("id"))
+			if err != nil {
+				return nil, err
+			}
 			return nil, t.Delete(ctx, "products", c.Param("id"))
 		})
+		if err == nil {
+			slog.Info("product.deleted", "shop_id", identity(c).ShopID, "product_id", deleted.ID, "product_code", deleted.Code)
+		}
+		return err
 	})
 	owner.GET("/products/:id/preorder", func(c *echo.Context) error {
 		q, err := shop.ParseQuery(c.QueryParams(), false)
@@ -256,9 +275,16 @@ func (a *Server) routes() {
 		if err := decode(c, &in); err != nil {
 			return err
 		}
-		return a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) {
-			return s.PreorderStatus(ctx, t, c.Param("id"), in.Status)
+		var updated shop.Product
+		err := a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) {
+			var err error
+			updated, err = s.PreorderStatus(ctx, t, c.Param("id"), in.Status)
+			return updated, err
 		})
+		if err == nil {
+			slog.Info("product.preorder_status_updated", "shop_id", identity(c).ShopID, "product_id", updated.ID, "product_code", updated.Code, "status", updated.Preorder.Status)
+		}
+		return err
 	})
 	owner.GET("/orders", func(c *echo.Context) error { return a.orders(c, false) })
 	owner.GET("/orders/search", func(c *echo.Context) error { return a.orders(c, true) })
@@ -399,9 +425,20 @@ func (a *Server) saveProduct(c *echo.Context) error {
 	if err := decode(c, &in); err != nil {
 		return err
 	}
-	return a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) {
-		return a.Service.SaveProduct(ctx, t, c.Param("id"), in)
+	var saved shop.Product
+	err := a.tx(c, true, func(ctx context.Context, t *store.Tx) (any, error) {
+		var err error
+		saved, err = a.Service.SaveProduct(ctx, t, c.Param("id"), in)
+		return saved, err
 	})
+	if err == nil {
+		action := "product.updated"
+		if c.Request().Method == http.MethodPost {
+			action = "product.created"
+		}
+		slog.Info(action, "shop_id", identity(c).ShopID, "product_id", saved.ID, "product_code", saved.Code, "sale_type", saved.SaleType)
+	}
+	return err
 }
 func (a *Server) orders(c *echo.Context, search bool) error {
 	q, err := shop.ParseQuery(c.QueryParams(), true)

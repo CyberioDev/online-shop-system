@@ -309,6 +309,7 @@ let integrations: Integrations = {
     deviceLabel: 'iPhone',
     lastReceivedAt: new Date(now.getTime() - 7 * 60_000).toISOString(),
   },
+  chatbot: { connected: false },
 };
 
 // ---------- Helpers ----------
@@ -735,5 +736,15 @@ export const mockApi: ApiClient = {
       [platform]: { connected: false, accountName: null, connectedAt: null },
     };
     return respond(integrations);
+  },
+
+  configureChatbotWebhook() {
+    integrations = { ...integrations, chatbot: { connected: true } };
+    return respond({ connected: true });
+  },
+
+  disconnectChatbotWebhook() {
+    integrations = { ...integrations, chatbot: { connected: false } };
+    return respond(undefined);
   },
 };

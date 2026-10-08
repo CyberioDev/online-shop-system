@@ -14,7 +14,10 @@ import (
 )
 
 type Identity struct{ ShopID, UserID, Role, TokenHash string }
-type Bootstrap struct{ ShopID, ShopName, OwnerName, Phone, Password, ChatbotKey, BankKey, WebhookURL, WebhookSecret, SMSURL, SMSSecret string }
+type Bootstrap struct {
+	ShopID, ShopName, OwnerName, Phone, Password, ChatbotKey, BankKey, WebhookURL, WebhookSecret, SMSURL, SMSSecret string
+	DemoData                                                                                                        bool
+}
 
 func (s *Service) Bootstrap(ctx context.Context, b Bootstrap) error {
 	if b.Phone == "" {
@@ -67,6 +70,11 @@ func (s *Service) Bootstrap(ctx context.Context, b Bootstrap) error {
 				return fmt.Errorf("invalid %s webhook target", target.kind)
 			}
 			if _, e = t.Exec(ctx, "INSERT INTO webhook_targets(shop_id,kind,url,secret) VALUES($1,$2,$3,$4) ON CONFLICT(shop_id,kind) DO NOTHING", b.ShopID, target.kind, target.url, target.secret); e != nil {
+				return e
+			}
+		}
+		if b.DemoData && b.ShopID == "demo-shop" {
+			if e = seedDemoShop(ctx, t); e != nil {
 				return e
 			}
 		}

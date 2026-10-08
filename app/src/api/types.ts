@@ -5,7 +5,7 @@
  *
  * - JSON keys are camelCase. IDs are opaque strings.
  * - Money is an integer number of tögrög (MNT), never a float or string.
- * - Dates in requests are calendar days `YYYY-MM-DD` in Asia/Ulaanbaatar (inclusive ranges).
+ * - Owner screens use calendar days locally; the HTTP adapter sends RFC 3339 half-open ranges.
  * - Timestamps in responses are RFC 3339 / ISO 8601 strings.
  */
 
@@ -118,7 +118,12 @@ export type PreorderDetail = {
   tally: PreorderTallyRow[];
   /** Every order containing this product, newest first. */
   orders: Order[];
+  total?: number;
+  nextCursor?: string | null;
 };
+
+export type ProductPage = { products: Product[]; total: number; nextCursor: string | null };
+export type ReviewCasePage = { cases: ReviewCase[]; total: number; nextCursor: string | null };
 
 // ---------- Orders ----------
 
@@ -343,6 +348,7 @@ export type Integrations = {
   facebook: MetaConnection;
   instagram: MetaConnection;
   sms: SmsListener;
+  chatbot?: { connected: boolean };
 };
 
 // ---------- Client ----------
@@ -434,4 +440,6 @@ export interface ApiClient {
    */
   connectMeta(platform: MetaPlatform, returnUrl: string): Promise<{ authUrl: string | null }>;
   disconnectMeta(platform: MetaPlatform): Promise<Integrations>;
+  configureChatbotWebhook(url: string, secret: string): Promise<{ connected: boolean }>;
+  disconnectChatbotWebhook(): Promise<void>;
 }

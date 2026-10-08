@@ -46,7 +46,7 @@ func run() error {
 		return err
 	}
 	service := &shop.Service{DB: db, CursorKey: []byte(secret), PublicURL: strings.TrimRight(env("PUBLIC_URL", "http://localhost:8080"), "/")}
-	if err = service.Bootstrap(ctx, shop.Bootstrap{ShopID: os.Getenv("BOOTSTRAP_SHOP_ID"), ShopName: os.Getenv("BOOTSTRAP_SHOP_NAME"), OwnerName: os.Getenv("BOOTSTRAP_OWNER_NAME"), Phone: os.Getenv("BOOTSTRAP_PHONE"), Password: os.Getenv("BOOTSTRAP_PASSWORD"), ChatbotKey: os.Getenv("BOOTSTRAP_CHATBOT_KEY"), BankKey: os.Getenv("BOOTSTRAP_BANK_KEY"), WebhookURL: os.Getenv("BOOTSTRAP_WEBHOOK_URL"), WebhookSecret: os.Getenv("BOOTSTRAP_WEBHOOK_SECRET"), SMSURL: os.Getenv("BOOTSTRAP_SMS_URL"), SMSSecret: os.Getenv("BOOTSTRAP_SMS_SECRET")}); err != nil {
+	if err = service.Bootstrap(ctx, shop.Bootstrap{ShopID: os.Getenv("BOOTSTRAP_SHOP_ID"), ShopName: os.Getenv("BOOTSTRAP_SHOP_NAME"), OwnerName: os.Getenv("BOOTSTRAP_OWNER_NAME"), Phone: os.Getenv("BOOTSTRAP_PHONE"), Password: os.Getenv("BOOTSTRAP_PASSWORD"), ChatbotKey: os.Getenv("BOOTSTRAP_CHATBOT_KEY"), BankKey: os.Getenv("BOOTSTRAP_BANK_KEY"), WebhookURL: os.Getenv("BOOTSTRAP_WEBHOOK_URL"), WebhookSecret: os.Getenv("BOOTSTRAP_WEBHOOK_SECRET"), SMSURL: os.Getenv("BOOTSTRAP_SMS_URL"), SMSSecret: os.Getenv("BOOTSTRAP_SMS_SECRET"), DemoData: strings.EqualFold(os.Getenv("BOOTSTRAP_DEMO_DATA"), "true")}); err != nil {
 		return err
 	}
 	if len(os.Args) > 1 && os.Args[1] == "provision" {

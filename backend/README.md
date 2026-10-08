@@ -81,8 +81,9 @@ See [`docs/api/openapi.yaml`](../docs/api/openapi.yaml) for the full contract.
 | Public images | `GET /media/{id}` | Unguessable public URL |
 
 List time ranges use RFC 3339 offsets, inclusive `from`, exclusive `to`. The owner
-frontend still needs migration from date-only queries and array responses to this
-contract. All unbounded owner lists paginate with `limit` and opaque `cursor`.
+frontend adapts its inclusive calendar-day filters and collects cursor pages where
+its screens need complete lists. All unbounded owner lists paginate with `limit`
+and opaque `cursor`.
 `nextCursor: null` ends traversal; exports must fetch all pages with unchanged
 filters and limit. Products and preorder overviews do not require time filters.
 Reports aggregate all matches independently of list pagination.
@@ -222,6 +223,13 @@ message delivery. Stock/payment operations still work without a destination;
 their events wait until that shop configures one.
 
 ## Tenant provisioning and configuration
+
+Docker Compose enables `BOOTSTRAP_DEMO_DATA` for the local `demo-shop`. On first
+startup after migration, the backend writes sample products, 60 days of orders,
+preorder demand, bank payments and review cases inside that tenant's database
+transaction. A per-shop marker makes the seed run once, including when upgrading
+an existing local database. The seed code refuses any shop ID other than
+`demo-shop`; deployments should leave `BOOTSTRAP_DEMO_DATA=false`.
 
 The local Compose defaults are only for development. Deployments must supply
 unique integration keys, an independent `CURSOR_SECRET` (at least 32 characters),

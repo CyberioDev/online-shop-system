@@ -1,27 +1,21 @@
 import * as Clipboard from 'expo-clipboard';
-import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
-import { api, type Integrations, type MetaPlatform } from '@/api';
+import { api, type Integrations } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { LoadState } from '@/components/ui/load-state';
 import { Column, Columns, Screen } from '@/components/ui/screen';
 import { ScreenHeader } from '@/components/ui/screen-header';
+import { TextField } from '@/components/ui/text-field';
 import { Text } from '@/components/ui/text';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { makeStyles, useColors } from '@/theme';
 import { useReloadOnFocus, useResource } from '@/hooks/use-resource';
-import { confirm } from '@/lib/confirm';
 import { errorMessage } from '@/lib/errors';
-import { formatRelative, formatShortDate } from '@/lib/format';
-
-// On web, Meta OAuth runs in a popup that lands back on /integrations; this closes
-// the popup and hands the result to the waiting openAuthSessionAsync call.
-WebBrowser.maybeCompleteAuthSession();
+import { formatRelative } from '@/lib/format';
 
 export default function IntegrationsScreen() {
   const colors = useColors();
@@ -46,7 +40,8 @@ export default function IntegrationsScreen() {
             <SmsListenerCard integrations={integrations} />
           </Column>
           <Column>
-            <MetaCard integrations={integrations} onChange={setData} />
+            <ChatbotWebhookCard integrations={integrations} onChange={setData} />
+            <MetaCard />
           </Column>
         </Columns>
       )}
@@ -54,14 +49,9 @@ export default function IntegrationsScreen() {
   );
 }
 
-// ---------- Meta ----------
+// ---------- Chatbot webhook ----------
 
-const META: Record<MetaPlatform, { label: string; icon: IconName; empty: string }> = {
-  facebook: { label: 'Facebook хуудас', icon: 'facebook', empty: 'Хуудас холбогдоогүй' },
-  instagram: { label: 'Instagram', icon: 'instagram', empty: 'Бүртгэл холбогдоогүй' },
-};
-
-function MetaCard({
+function ChatbotWebhookCard({
   integrations,
   onChange,
 }: {
@@ -70,63 +60,30 @@ function MetaCard({
 }) {
   const colors = useColors();
   const styles = useStyles();
-  return (
-    <Card padded={false}>
-      <View style={styles.cardHeader}>
-        <Text variant="title">Meta</Text>
-        <Text variant="caption" color={colors.textSecondary}>
-          Чат, коммент дээрх захиалгыг автоматаар хүлээн авна.
-        </Text>
-      </View>
-      {(['facebook', 'instagram'] as const).map((platform) => (
-        <MetaRow
-          key={platform}
-          platform={platform}
-          integrations={integrations}
-          onChange={onChange}
-        />
-      ))}
-    </Card>
-  );
-}
-
-function MetaRow({
-  platform,
-  integrations,
-  onChange,
-}: {
-  platform: MetaPlatform;
-  integrations: Integrations;
-  onChange: (next: Integrations) => void;
-}) {
-  const colors = useColors();
-  const styles = useStyles();
-  const connection = integrations[platform];
-  const meta = META[platform];
+  const [url, setUrl] = useState('');
+  const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const toggle = async () => {
-    if (connection.connected) {
-      const ok = await confirm(
-        `${meta.label} салгах`,
-        'Салгавал энэ сувгаас ирэх захиалга автоматаар бүртгэгдэхгүй.',
-        'Салгах',
-      );
-      if (!ok) return;
-    }
+  const connected = integrations.chatbot?.connected ?? false;
+  const save = async () => {
     setBusy(true);
     setError(null);
     try {
-      if (connection.connected) {
-        onChange(await api.disconnectMeta(platform));
-      } else {
-        // The backend returns Meta's consent page; after its callback it redirects to returnUrl.
-        const returnUrl = Linking.createURL('/integrations');
-        const { authUrl } = await api.connectMeta(platform, returnUrl);
-        if (authUrl) await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);
-        onChange(await api.getIntegrations());
-      }
+      await api.configureChatbotWebhook(url.trim(), secret);
+      setSecret('');
+      onChange({ ...integrations, chatbot: { connected: true } });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const disconnect = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.disconnectChatbotWebhook();
+      onChange({ ...integrations, chatbot: { connected: false } });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -135,34 +92,38 @@ function MetaRow({
   };
 
   return (
-    <View style={styles.metaRow}>
-      <View style={styles.metaIcon}>
-        <Icon name={meta.icon} size={20} color={colors.text} />
-      </View>
-      <View style={styles.flex}>
-        <View style={styles.inline}>
-          <Text variant="bodyMedium">{meta.label}</Text>
-          <StatusPill active={connection.connected} />
+    <Card style={styles.cardGap}>
+      <View style={styles.cardHeader}>
+        <View style={styles.titleRow}>
+          <Text variant="title">Make / Zapier чатбот</Text>
+          <StatusPill active={connected} activeLabel="Идэвхтэй" />
         </View>
-        <Text variant="caption" color={colors.textSecondary} numberOfLines={2}>
-          {connection.connected
-            ? `${connection.accountName}${connection.connectedAt ? ` · ${formatShortDate(new Date(connection.connectedAt))}-нд холбосон` : ''}`
-            : meta.empty}
+        <Text variant="caption" color={colors.textSecondary}>
+          Чатбот backend-ээс бараа, төлбөрийн мэдээлэл авч захиалга үүсгэнэ. Төлбөр батлагдсан
+          зэрэг үйл явдлыг энэ HTTPS webhook руу илгээнэ.
         </Text>
-        {error && (
-          <Text variant="caption" color={colors.danger}>
-            {error}
-          </Text>
-        )}
       </View>
-      <Button
-        title={connection.connected ? 'Салгах' : 'Холбох'}
-        variant={connection.connected ? 'outline' : 'primary'}
-        size="sm"
-        loading={busy}
-        onPress={toggle}
-      />
-    </View>
+      <TextField label="Webhook URL" value={url} onChangeText={setUrl} autoCapitalize="none" keyboardType="url" placeholder="https://hook.make.com/..." />
+      <TextField label="Webhook secret" value={secret} onChangeText={setSecret} autoCapitalize="none" secureTextEntry hint="Хамгийн багадаа 32 тэмдэгт. Өмнөх secret-ийг дахин харуулахгүй." />
+      {error && <Text variant="caption" color={colors.danger}>{error}</Text>}
+      <View style={styles.buttonRow}>
+        <Button title="Webhook хадгалах" size="md" loading={busy} disabled={!url.trim() || secret.length < 32} onPress={save} />
+        {connected && <Button title="Салгах" size="md" variant="outline" loading={busy} onPress={disconnect} />}
+      </View>
+    </Card>
+  );
+}
+
+function MetaCard() {
+  const colors = useColors();
+  return (
+    <Card>
+      <Text variant="title">Facebook / Instagram</Text>
+      <Text variant="caption" color={colors.textSecondary}>
+        Сувгийн Meta холболтыг Make эсвэл Zapier дээр тохируулна. Энэ систем Meta OAuth нэвтрэлт
+        ашиглахгүй.
+      </Text>
+    </Card>
   );
 }
 
@@ -390,6 +351,11 @@ const useStyles = makeStyles((colors) => ({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: Spacing.three,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.three,
   },
   metaRow: {

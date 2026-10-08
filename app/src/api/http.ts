@@ -118,8 +118,34 @@ export function createHttpApi(baseUrl: string): ApiClient {
     return { ...input, imageUrl: await uploadImage(input.imageUrl) };
   }
 
-  const range = ({ from, to }: DateRange) =>
-    `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  // The owner UI stores inclusive Ulaanbaatar calendar days; the API uses
+  // half-open RFC 3339 instants. Ulaanbaatar is UTC+08:00.
+  const range = ({ from, to }: DateRange) => {
+    const start = new Date(`${from}T00:00:00+08:00`).toISOString();
+    const nextDay = new Date(`${to}T00:00:00Z`);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    const end = `${nextDay.toISOString().slice(0, 10)}T00:00:00+08:00`;
+    return new URLSearchParams({ from: start, to: end }).toString();
+  };
+
+  async function allPages<T>(
+    path: string,
+    field: 'products' | 'orders' | 'cases',
+    filters: Record<string, string> = {},
+  ): Promise<T[]> {
+    const results: T[] = [];
+    let cursor: string | null = null;
+    do {
+      const params = new URLSearchParams({ ...filters, limit: '100' });
+      if (cursor) params.set('cursor', cursor);
+      const page = await request<Record<typeof field, T[]> & { nextCursor: string | null }>(
+        'GET', `${path}?${params.toString()}`,
+      );
+      results.push(...page[field]);
+      cursor = page.nextCursor;
+    } while (cursor);
+    return results;
+  }
 
   return {
     isMock: false,
@@ -144,7 +170,7 @@ export function createHttpApi(baseUrl: string): ApiClient {
 
     getTodaySummary: () => request<TodaySummary>('GET', '/dashboard/today'),
 
-    listProducts: () => request<Product[]>('GET', '/products'),
+    listProducts: () => allPages<Product>('/products', 'products'),
     getProduct: (id) => request<Product>('GET', `/products/${id}`),
     createProduct: async (input) =>
       request<Product>('POST', '/products', await withUploadedImage(input)),
@@ -152,15 +178,32 @@ export function createHttpApi(baseUrl: string): ApiClient {
       request<Product>('PUT', `/products/${id}`, await withUploadedImage(input)),
     updateProductPrice: (id, price) => request<Product>('PATCH', `/products/${id}`, { price }),
     deleteProduct: (id) => request<void>('DELETE', `/products/${id}`),
-    getPreorder: (id) => request<PreorderDetail>('GET', `/products/${id}/preorder`),
+    getPreorder: async (id) => {
+      let cursor: string | null = null;
+      let result: PreorderDetail | null = null;
+      const orders: Order[] = [];
+      do {
+        const params = new URLSearchParams({ limit: '100' });
+        if (cursor) params.set('cursor', cursor);
+        const page = await request<PreorderDetail>('GET', `/products/${id}/preorder?${params}`);
+        result ??= page;
+        orders.push(...page.orders);
+        cursor = page.nextCursor ?? null;
+      } while (cursor);
+      return { ...result!, orders, nextCursor: null };
+    },
     setPreorderStatus: (id, status) =>
       request<Product>('POST', `/products/${id}/preorder/status`, { status }),
 
     getReport: (r) => request<ReportSummary>('GET', `/reports/summary?${range(r)}`),
-    listOrders: (r) => request<Order[]>('GET', `/orders?${range(r)}`),
+    listOrders: (r) => allPages<Order>('/orders', 'orders', Object.fromEntries(new URLSearchParams(range(r)))),
 
     searchOrders: ({ view, q, cursor, limit }) => {
-      const params = new URLSearchParams({ view });
+      const params = new URLSearchParams({
+        view,
+        from: '1970-01-01T00:00:00Z',
+        to: '2100-01-01T00:00:00Z',
+      });
       if (q) params.set('q', q);
       if (cursor) params.set('cursor', cursor);
       if (limit) params.set('limit', String(limit));
@@ -174,7 +217,14 @@ export function createHttpApi(baseUrl: string): ApiClient {
     restoreOrder: (id) => request<Order>('POST', `/orders/${id}/restore`),
 
     getReviewSummary: () => request<ReviewSummary>('GET', '/review/summary'),
-    listReviewCases: () => request<ReviewCase[]>('GET', '/review/cases'),
+    listReviewCases: async () => {
+      // Include every open/waiting case, even if it is old; the summary badge
+      // remains global and resolved history is intentionally available here too.
+      return allPages<ReviewCase>('/review/cases', 'cases', {
+        from: '1970-01-01T00:00:00Z',
+        to: '2100-01-01T00:00:00Z',
+      });
+    },
     getReviewCase: (id) => request<ReviewCase>('GET', `/review/cases/${id}`),
     searchCaseCandidates: (id, query) =>
       request<MatchCandidate[]>(
@@ -193,5 +243,8 @@ export function createHttpApi(baseUrl: string): ApiClient {
         returnUrl,
       }),
     disconnectMeta: (platform) => request<Integrations>('DELETE', `/integrations/meta/${platform}`),
+    configureChatbotWebhook: (url, secret) =>
+      request<{ connected: boolean }>('PUT', '/integrations/chatbot', { url, secret }),
+    disconnectChatbotWebhook: () => request<void>('DELETE', '/integrations/chatbot'),
   };
 }

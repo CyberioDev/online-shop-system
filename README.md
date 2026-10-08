@@ -45,30 +45,27 @@ docker compose up --build backend
 This setup runs the frontend for local web development. Native iOS/Android builds
 and phone connectivity require their own Expo setup.
 
-## Frontend demo mode
+## Frontend data source
 
-The backend now implements the owner, chatbot and bank APIs with PostgreSQL. The
-frontend still runs on in-memory demo data by default
-(`app/src/api/mock.ts`): sign in with the temporary test account `99996666` /
-`admintest` (shown on the login page; defined as `TEST_ACCOUNT` in
-`app/src/constants/config.ts`). Changes are lost on reload.
+Docker Compose starts the frontend, Go backend and PostgreSQL together. The
+frontend's default API URL is `http://localhost:8080`, so browser requests reach
+the published backend port. The backend migrates the database and idempotently
+seeds the local demo shop with sample products, order history and payment-review
+cases; sign in with `99996666` / `admintest`. Without an API URL, the app uses
+in-memory demo data from `app/src/api/mock.ts` instead.
 
 ## Connecting the backend
 
-See **[backend/README.md](backend/README.md)** for the Docker test workflow, tenant
-provisioning, Make/Zapier integration and bank transaction payloads. The current
-contract is **[docs/api/openapi.yaml](docs/api/openapi.yaml)**.
-
-The frontend client still needs the v0.2 migration (date-time ranges and paginated
-responses) before all screens can use the real backend. The older
-[frontend integration guide](docs/backend-integration.md) documents its original
-mock behavior.
-
-To point the app at a running backend, set `EXPO_PUBLIC_API_URL`:
+Start everything with Docker:
 
 ```sh
-EXPO_PUBLIC_API_URL=http://localhost:8080 docker compose up --build frontend backend
+docker compose up --build
 ```
 
-Without Docker, copy `app/.env.example` to `app/.env.local`, set the URL, and run
-`npx expo start --clear` (the `--clear` is needed whenever the URL changes).
+The frontend HTTP client adapts the screens' inclusive Ulaanbaatar date ranges to
+the API's RFC 3339 half-open time ranges and follows cursor pagination. To change
+the API host (for example, when opening the app on a phone), set
+`EXPO_PUBLIC_API_URL` to a URL the browser or device can reach, such as your
+computer's LAN IP on port 8080. See **[backend/README.md](backend/README.md)** for
+tenant isolation, API details, and Make/Zapier and bank listener integration.
+The API contract is **[docs/api/openapi.yaml](docs/api/openapi.yaml)**.
